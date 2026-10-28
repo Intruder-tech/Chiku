@@ -31,6 +31,8 @@ class PersonaSettings(BaseModel):
     # Words the TTS mispronounces -> how to spell them for speech, e.g. {"Jalaj": "Juh-luj"}.
     pronunciations: dict[str, str] = Field(default_factory=dict)
     extra_instructions: str = Field("", max_length=2000)
+    # Topics the user cares about (Profile page); helps pick examples and suggestions.
+    interests: list[str] = Field(default_factory=list, max_length=20)
 
 
 def build_system_prompt(
@@ -51,7 +53,10 @@ def build_system_prompt(
         "Windows 11 laptop.",
         f"Personality: {p.tone}.",
         who,
-        f"Speak {p.language}.",
+        "Language: reply in the language named at the start of the user's latest message, "
+        "unless the user asks for a different one. If none is named, reply in the language that "
+        f"message is written in, or {p.language}. Write Hindi in Devanagari script, because "
+        "your replies are read aloud.",
         f"You are powered by {model_label}. If asked, say so honestly.",
         "",
         "Your replies are converted to speech, so:",
@@ -117,22 +122,29 @@ def build_system_prompt(
             "it. Never store passwords, codes, card or ID numbers, or health/financial details. "
             "When asked to forget something, call forget_memory."
         )
+    interests = [i.strip() for i in p.interests if i.strip()]
+    if interests:
+        lines += ["", f"The user is interested in: {', '.join(interests)}. Use this for examples "
+                  "and suggestions when it fits; don't bring it up otherwise."]
     if p.extra_instructions.strip():
         lines += ["", "Additional user preferences:", p.extra_instructions.strip()]
     # The system prompt must stay byte-identical between turns: the model server then reuses
     # its cached prompt (this text plus the tool definitions, ~3k tokens). Measured on Qwen3-4B:
     # first token 2.07 s -> 0.16 s. So the clock is NOT in here; the assistant prefixes the
     # newest user message with it instead (see time_prefix).
-    lines.append("- Each user message starts with [Local time: …]. Use it for anything about "
-                 "dates or times, and never mention the bracket itself.")
+    lines.append("- Each user message starts with [Local time: …], usually followed by the "
+                 "language to reply in. Use it for dates, times and the reply language, and "
+                 "never mention the bracket itself.")
     if memory:
         lines += ["", memory]
     return "\n".join(lines)
 
 
-def time_prefix(now: datetime | None = None) -> str:
+def time_prefix(now: datetime | None = None, language: str | None = None) -> str:
+    """Per-message context line; `language` names the language to reply in, if known."""
     now = now or datetime.now()
-    return f"[Local time: {now:%A %d %B %Y, %H:%M}]\n"
+    reply = f" | Reply in {language}" if language else ""
+    return f"[Local time: {now:%A %d %B %Y, %H:%M}{reply}]\n"
 
 
 def apply_pronunciations(text: str, p: PersonaSettings) -> str:

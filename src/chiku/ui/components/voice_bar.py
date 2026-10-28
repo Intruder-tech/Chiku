@@ -13,6 +13,7 @@ from chiku.ui.waveform import Waveform
 STATE_TEXT = {
     State.LOADING: "Getting ready…",
     State.IDLE: "Mic is off. Turn it on or type below.",
+    State.WAITING: "Say “Hey Chiku” or “Wake up”, or type below.",
     State.LISTENING: "Listening",
     State.HEARING: "Hearing you…",
     State.THINKING: "Thinking…",
@@ -32,14 +33,17 @@ def state_text(state: State, detail: str) -> str:
 
 
 class VoiceBar(QWidget):
-    def __init__(self, mascot_size: int = 104):
+    def __init__(self, mascot_size: int = 104, vertical: bool = False):
         super().__init__()
-        lay = QHBoxLayout(self)
+        # vertical: mascot above the text (the workspace's right panel)
+        lay = QVBoxLayout(self) if vertical else QHBoxLayout(self)
         lay.setContentsMargins(16, 10, 16, 4)
         self.mascot = MascotWidget(mascot_size)
         lay.addWidget(self.mascot)
         col = QVBoxLayout()
         self.state = label(STATE_TEXT[State.LOADING], "state", wrap=True)
+        if vertical:
+            self.state.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         col.addWidget(self.state)
         self.wave = Waveform()
         self.wave.setMinimumHeight(36)

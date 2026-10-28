@@ -468,3 +468,54 @@ def test_levels_are_zero_when_streams_inactive(harness: Harness) -> None:
     a = harness.started()
     harness.player.level = 0.5  # stale value must not show while nothing plays
     assert a.levels() == (0.0, 0.0)
+
+
+def test_hindi_command_is_acknowledged_in_hindi_with_hindi_voice(harness: Harness) -> None:
+    a = harness.started()
+    a.submit_text("Chrome kholo")
+    assert idle_after_reply(harness)
+    assert harness.llm.calls == []
+    assert [e.name for e in harness.recorder.launched] == ["Google Chrome"]
+    reply = final_assistant(harness)[0]
+    assert "खोल" in reply.text and "हो गया" in reply.text
+    assert set(harness.tts.voices_used) == {"hf_alpha"}  # Devanagari sentences, Hindi voice
+
+
+def test_hindi_voice_turn_tells_model_the_reply_language(harness: Harness) -> None:
+    harness.stt.text = "आज मौसम कैसा है"
+    harness.stt.language = "hi"
+    harness.llm.scripts = [[StreamChunk("आज धूप है। "), StreamChunk("Enjoy!", done=True)]]
+    harness.capture = FakeCapture([0.0] * 5 + [0.9] * 15 + [0.0] * 10)
+    a = harness.started()
+    a.set_mic(True)
+    assert idle_after_reply(harness)
+    a.set_mic(False)
+    assert "| Reply in Hindi]" in harness.llm.calls[0][-1].content
+    # each sentence gets the voice of its own language
+    assert harness.tts.voices_used == ["hf_alpha", None]
+
+
+def test_typed_language_is_detected_and_sticks(harness: Harness) -> None:
+    harness.llm.scripts = [[StreamChunk("Canberra.", done=True)],
+                           [StreamChunk("De nada.", done=True)]]
+    a = harness.started()
+    a.submit_text("¿Cuál es la capital de Australia?")
+    assert idle_after_reply(harness)
+    a.submit_text("ok")  # too short to tell: stays Spanish
+    assert idle_after_reply(harness, 2)
+    assert "| Reply in Spanish]" in harness.llm.calls[0][-1].content
+    assert "| Reply in Spanish]" in harness.llm.calls[1][-1].content
+    assert set(harness.tts.voices_used) == {"ef_dora"}
+
+
+def test_language_without_voice_is_text_only_with_one_notice(harness: Harness) -> None:
+    harness.llm.scripts = [[StreamChunk("Es ist Mittag.", done=True)],
+                           [StreamChunk("Gern geschehen.", done=True)]]
+    a = harness.started()
+    a.submit_text("Wie spät ist es?")
+    assert idle_after_reply(harness)
+    a.submit_text("Danke sehr, wie nett")
+    assert idle_after_reply(harness, 2)
+    assert harness.tts.spoken == []  # nothing spoken in a voice that can't pronounce German
+    notices = [m.text for m in harness.of(Message) if m.role == "notice"]
+    assert len([n for n in notices if "German voice" in n]) == 1

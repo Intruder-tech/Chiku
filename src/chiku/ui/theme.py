@@ -113,6 +113,27 @@ QPushButton#ghost {{ background: transparent; border: none; color: {c['MUTED']};
 QPushButton#ghost:hover {{ color: {c['TEXT']}; }}
 QWidget#compact {{ background: {c['SURFACE']}; border: 1px solid {c['BORDER']};
                    border-radius: 18px; }}
+QPushButton#notchMic {{ border-radius: 17px; min-width: 34px; max-width: 34px; min-height: 34px;
+                        max-height: 34px; font-size: 8pt; font-weight: 700; padding: 0;
+                        border: 2px solid {c['BORDER']}; }}
+QPushButton#notchMic:checked {{ background: {c['ACCENT']}; color: {c['ACCENT_TEXT']};
+                                border-color: {c['ACCENT']}; }}
+QLabel#notchReply {{ font-size: 9.5pt; }}
+QFrame#context {{ background: {c['SIDEBAR']}; border-left: 1px solid {c['BORDER']}; }}
+QLabel#sectionTitle {{ color: {c['MUTED']}; font-size: 8.5pt; font-weight: 700;
+                       letter-spacing: 0.6px; }}
+QFrame#card {{ background: {c['SURFACE']}; border: 1px solid {c['BORDER']};
+               border-radius: 14px; }}
+QLabel#statNumber {{ font-size: 16pt; font-weight: 700; color: {c['TEXT']}; }}
+QDialog#palette {{ background: {c['SURFACE']}; border: 1px solid {c['ACCENT']};
+                   border-radius: 14px; }}
+QListWidget#paletteList, QListWidget#chats {{ background: transparent; border: none;
+                                              outline: none; }}
+QListWidget#paletteList::item, QListWidget#chats::item {{ padding: 6px 8px; border-radius: 8px;
+                                                          color: {c['TEXT']}; }}
+QListWidget#chats::item {{ color: {c['MUTED']}; }}
+QListWidget#paletteList::item:selected, QListWidget#chats::item:selected {{
+    background: {c['SURFACE_2']}; color: {c['TEXT']}; }}
 QTabWidget::pane {{ border: 1px solid {c['BORDER']}; border-radius: 10px; top: -1px; }}
 QTabBar::tab {{ background: transparent; color: {c['MUTED']}; padding: 8px 12px; border: none; }}
 QTabBar::tab:selected {{ color: {c['TEXT']}; border-bottom: 2px solid {c['ACCENT']}; }}

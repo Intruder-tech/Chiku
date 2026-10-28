@@ -51,6 +51,9 @@ class MascotWidget(QWidget):
         scale, angle, dy, opacity, ring = 1.0, 0.0, 0.0, 1.0, 0.0
         if s in (State.IDLE, State.LOADING):
             opacity = 0.55 if s is State.IDLE else 0.75
+        elif s is State.WAITING:  # dozing: slow breathing, waiting for her name
+            opacity = 0.7
+            scale = 1.0 + 0.015 * math.sin(t * 1.2)
         elif s is State.LISTENING:
             scale = 1.0 + 0.02 * math.sin(t * 2.0)
             ring = lvl

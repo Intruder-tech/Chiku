@@ -35,6 +35,14 @@ class AppPaths:
         return self.data_dir / "memory.db"
 
     @property
+    def conversations_file(self) -> Path:  # only written if the user keeps chat history
+        return self.data_dir / "conversations.json"
+
+    @property
+    def avatar_file(self) -> Path:  # the user's profile picture, if they chose one
+        return self.data_dir / "avatar.png"
+
+    @property
     def audit_file(self) -> Path:
         return self.data_dir / "audit" / "actions.jsonl"
 

@@ -16,16 +16,18 @@ from typing import Protocol
 import numpy as np
 
 from chiku.config import STTSettings
+from chiku.language import choose as choose_language
 from chiku.models import whisper_dir, whisper_present
 from chiku.paths import cli_command
 
 log = logging.getLogger(__name__)
 
 # Phrases Whisper is known to hallucinate on silence/noise.
-_HALLUCINATIONS = {
+_HALLUCINATION_TEXT = (
     "you", "thank you for watching", "thanks for watching", "please subscribe",
-    "subtitles by the amaraorg community", "", "bye",
-}
+    "subtitles by the amara.org community", "", "bye",
+    "धन्यवाद", "सब्सक्राइब करें", "शुक्रिया",
+)
 
 
 class ModelMissing(RuntimeError):
@@ -37,6 +39,8 @@ class Transcript:
     text: str
     audio_s: float
     elapsed_s: float
+    language: str = "en"  # ISO 639-1 code the text was transcribed in
+    language_prob: float = 1.0  # Whisper's confidence in its own language detection
 
 
 class SpeechToText(Protocol):
@@ -48,9 +52,10 @@ class SpeechToText(Protocol):
 
 
 class WhisperSTT:
-    def __init__(self, settings: STTSettings, models_dir: Path):
+    def __init__(self, settings: STTSettings, models_dir: Path, prompt: str | None = None):
         self.settings = settings
         self.models_dir = models_dir
+        self.prompt = prompt  # Whisper's initial_prompt: biases spelling of expected words
         self._model = None
         self.device_used = "unloaded"
         self.name = f"whisper {settings.model}"
@@ -99,20 +104,28 @@ class WhisperSTT:
             self.device_used = "cpu"
         self.name = f"whisper {self.settings.model} ({self.device_used})"
 
+    @property
+    def multilingual(self) -> bool:
+        return not self.settings.model.endswith(".en")
+
     def transcribe(self, audio: np.ndarray) -> Transcript:
         self.load()
         assert self._model is not None
         t0 = time.perf_counter()
-        segments, _info = self._model.transcribe(
-            audio.astype(np.float32, copy=False),
-            language=self.settings.language or None,
-            beam_size=1,
-            best_of=1,
-            temperature=0.0,
-            condition_on_previous_text=False,
-            without_timestamps=True,
-            vad_filter=False,
-        )
+        audio = audio.astype(np.float32, copy=False)
+        lang = self.settings.language if self.multilingual else "en"
+        segments, info = self._decode(audio, None if lang == "auto" else lang)
+        language, prob = info.language, info.language_probability
+        if lang == "auto":
+            # Detection happens inside transcribe() before any text is decoded, so switching
+            # language here costs one more encoder pass, not a second full transcription.
+            chosen = choose_language(language, prob, info.all_language_probs,
+                                     self.settings.preferred_languages)
+            if chosen != language:
+                log.info("speech detected as %s (p=%.2f); transcribing as %s",
+                         language, prob, chosen)
+                segments, _info = self._decode(audio, chosen)
+                language = chosen
         parts = []
         for seg in segments:
             if seg.no_speech_prob > 0.6 and seg.avg_logprob < -1.0:
@@ -121,7 +134,22 @@ class WhisperSTT:
         text = " ".join(p for p in parts if p).strip()
         if _normalise(text) in _HALLUCINATIONS or re.fullmatch(r"[\[(].*[\])]", text):
             text = ""
-        return Transcript(text, len(audio) / 16000, time.perf_counter() - t0)
+        return Transcript(text, len(audio) / 16000, time.perf_counter() - t0,
+                          language or "en", float(prob or 0.0))
+
+    def _decode(self, audio: np.ndarray, language: str | None):  # noqa: ANN202
+        assert self._model is not None
+        return self._model.transcribe(
+            audio,
+            language=language,
+            beam_size=1,
+            best_of=1,
+            temperature=0.0,
+            condition_on_previous_text=False,
+            without_timestamps=True,
+            vad_filter=False,
+            initial_prompt=self.prompt,
+        )
 
 
 _LOAD_LOCK = threading.Lock()
@@ -164,4 +192,8 @@ def _register_cuda_dlls() -> bool:
 
 
 def _normalise(text: str) -> str:
-    return re.sub(r"[^a-z ]", "", text.lower()).strip()
+    # \w keeps letters of every script: Hindi text must not normalise to "" (a hallucination).
+    return re.sub(r"[^\w ]|[\d_]", "", text.lower()).strip()
+
+
+_HALLUCINATIONS = {_normalise(t) for t in _HALLUCINATION_TEXT}

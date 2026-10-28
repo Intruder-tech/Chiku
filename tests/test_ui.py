@@ -118,3 +118,31 @@ def test_voice_bar_and_compact(app: QApplication) -> None:
     c.set_state(State.LISTENING, "")
     c.tick(State.LISTENING, 0.05, True)
     assert c.state.text() == "Listening" and c.mic.isChecked()
+
+
+@pytest.mark.parametrize("model_present", [True, False])
+def test_languages_tab_switches_speech_model(app: QApplication, harness, tmp_path,  # noqa: ANN001
+                                             monkeypatch: pytest.MonkeyPatch,
+                                             model_present: bool) -> None:
+    from chiku import models
+    from chiku.paths import AppPaths
+    from chiku.ui.settings_dialog import SettingsDialog
+
+    monkeypatch.setattr(models, "whisper_present", lambda _d, _n: model_present)
+    a = harness.build()
+    d = SettingsDialog(a, AppPaths(config_dir=tmp_path / "c", data_dir=tmp_path / "d"))
+    assert d.lang_download.isHidden() is model_present  # offered only when missing
+    d.lang_mode.setCurrentIndex(d.lang_mode.findData("auto"))
+    d.lang_hi.setChecked(True)
+    d.lang_other.setText("es, xx1, fr")
+    d.hindi_voice.setCurrentText("hf_beta")
+    data = a.settings.model_dump()
+    d._language_settings(data)
+    if model_present:
+        assert (data["stt"]["model"], data["stt"]["language"]) == ("small", "auto")
+    else:  # never switch to a model that isn't on disk
+        assert (data["stt"]["model"], data["stt"]["language"]) == ("small.en", "en")
+    assert data["stt"]["preferred_languages"] == ["en", "hi", "es", "fr"]
+    assert data["tts"]["voices"]["hi"] == "hf_beta"
+    d.close()
+    d.deleteLater()

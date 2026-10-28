@@ -20,6 +20,7 @@ from chiku.assistant import (
     StateChanged,
     ToolActivity,
     TurnMetrics,
+    Woke,
 )
 
 
@@ -30,6 +31,7 @@ class AssistantViewModel(QObject):
     component = Signal(str, bool, str)
     mic_changed = Signal(bool)
     metrics = Signal(dict)
+    woke = Signal(str)  # wake phrase heard
     _event = Signal(object)  # internal: crosses from engine threads to the UI thread
     confirm_requested = Signal(str, str, object)
 
@@ -62,6 +64,8 @@ class AssistantViewModel(QObject):
             self.mic_changed.emit(ev.on)
         elif isinstance(ev, TurnMetrics):
             self.metrics.emit(dict(ev.values))
+        elif isinstance(ev, Woke):
+            self.woke.emit(ev.phrase)
 
     def confirm_from_worker(self, name: str, description: str) -> bool:
         """Blocking confirmation for tools; the window shows the dialog on the UI thread."""
@@ -79,6 +83,14 @@ class AssistantViewModel(QObject):
     def set_mic(self, on: bool) -> None:
         if self.assistant:
             self.assistant.set_mic(on)
+
+    def set_wake(self, on: bool) -> None:
+        if self.assistant:
+            self.assistant.set_wake(on)
+
+    @property
+    def wake_listening(self) -> bool:
+        return bool(self.assistant and self.assistant.wake_listening)
 
     def send(self, text: str) -> None:
         if self.assistant and text.strip():

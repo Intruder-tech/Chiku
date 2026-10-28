@@ -93,6 +93,9 @@ end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
+  if CurUninstallStep = usUninstall then
+    { "Start Chiku when I sign in" (Settings > Background) points at the removed exe }
+    RegDeleteValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run', 'Chiku');
   if (CurUninstallStep = usPostUninstall) and DeleteUserData then
   begin
     DelTree(ExpandConstant('{localappdata}\Chiku'), True, True, True);

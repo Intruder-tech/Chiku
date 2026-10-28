@@ -2,6 +2,86 @@
 
 All notable changes to this project are listed here. Versions follow [SemVer](https://semver.org).
 
+## [0.5.3] - 2026-10-28
+
+Discord Rich Presence (roadmap item 3) is not in this release; it needs the Discord
+application to be created first.
+
+### Added
+
+- Multilingual conversation. With the multilingual Whisper model (Settings → Languages, one
+  ~484 MB download), Chiku detects the language of each utterance and replies in it.
+  - English and Hindi are first-class. When Whisper labels Hindi speech as Urdu (common), it
+    is transcribed as Hindi, and unsure detections fall back to the languages you speak.
+  - Typed messages: the language is recognised from the script or common words, and short
+    replies such as "ok" keep the conversation's language.
+  - Each reply sentence is spoken by a voice for its own language: Hindi (`hf_alpha`,
+    `hf_beta`), Spanish, French, Italian, Portuguese, Japanese and Chinese. Languages with no
+    Kokoro voice (German, for example) are answered in text, with a one-time notice.
+  - Hindi built-in commands, in Devanagari or romanised: "Chrome kholo", "गाना रोको",
+    "आवाज़ बढ़ाओ", "VLC install karo", "याद रखना कि …". Chiku acknowledges them in Hindi.
+- New settings: `stt.preferred_languages`, `tts.voices` (voice per language), and `stt.language`
+  `auto`. A Languages tab in Settings has a Hindi voice test.
+- Pro workspace: three panes.
+  - **Left:** pages (Chat, Profile, Apps, Memory, Activity, Settings) and a list of chats.
+  - **Centre:** the chat or the current page.
+  - **Right:** the live mascot, voice level and component status, the sources of the last
+    answer and recent actions. Ctrl+. toggles it; it hides itself below 1060 px.
+- Conversations: several chats (Ctrl+N for a new one; right-click to delete), each with its
+  own model context. They are kept in memory only, unless Settings → Privacy → "Keep
+  conversation history" is ticked (`conversations.keep_history`, off by default); unticking
+  it deletes `conversations.json`. A reopened chat gives the model back its text, without
+  earlier tool calls.
+- Command palette (Ctrl+K): pages, actions (new chat, mic, stop, notch, card, wake word,
+  theme, side panel, app updates, quit), every Settings tab, past chats, and "Open <app>",
+  which goes through the normal permission-checked command path.
+- Profile page:
+  - Name and pronunciation (with a "Hear it" button), and an optional picture.
+  - Interests (`persona.interests`, used in the prompt), answer length, tone, reply
+    language, and English and Hindi voices.
+  - Memories grouped by category.
+  - Usage counted from the local action log.
+  - Export my data (JSON) and Delete my data.
+- Apps page: installed apps (filter), available updates and "Get apps" search, all through
+  winget. Install, update and uninstall run through the same tools as voice requests, so
+  each is confirmed and logged.
+- Notch: minimised Chiku as a pill hanging from the top edge of the screen, with the mascot,
+  live state, level meter and mic. Hover or click to see the last reply and Stop / Open /
+  Card / Hide. Drag it anywhere, including to another monitor; on release it snaps to the top
+  edge of the screen under the cursor. The position is remembered per screen
+  (`ui.notch_positions`), and if that monitor is unplugged the notch moves to the primary
+  screen. The notch is the default minimised style (`ui.mini_mode`); the floating card
+  remains as an option. Ctrl+Shift+Space switches between the full window and the minimised
+  style, and the tray menu offers both styles.
+- Background mode and wake word (opt-in, Settings → Background, one ~75 MB download).
+  - While the mic is off, say "Hey Chiku" or "Wake up". Chiku chimes and listens; "Hey Chiku,
+    what time is it?" in one breath is answered directly. After a quiet follow-up period
+    (`wake.follow_up_s`, 20 s by default) she goes back to waiting.
+  - Short speech segments found by voice activity detection are checked by Whisper `tiny.en`
+    on 2 CPU threads. Transcripts are compared with the wake phrases and discarded: never
+    shown, logged, stored or sent.
+  - The tray icon shows a green dot while the mic is open for the wake word, and its menu
+    switches the wake word on or off. Listening pauses while the screen is locked.
+  - With the wake word on, closing the window keeps Chiku in the tray; "Quit Chiku" in the
+    tray menu exits. If she wakes while hidden, the notch appears and hides again.
+  - "Start Chiku in the background when I sign in" adds a per-user `Run` registry value that
+    launches `Chiku.exe --background` (tray only). The uninstaller removes it.
+
+### Fixed
+
+- winget commands with large output (`winget list` on a PC with many apps, or many available
+  updates) never finished. The output was only read after winget exited, so winget blocked
+  on a full pipe until the 2-minute timeout. It is now read while waiting: 220 installed
+  apps list in about 1 s.
+
+### Changed
+
+- The system prompt asks for a reply in the user's language, and each user message names the
+  language to reply in. The prompt itself is unchanged between turns, so it stays cached.
+- The Whisper hallucination filter now keeps non-Latin text. Previously, any Hindi transcript
+  would have been discarded as empty.
+- Sentence splitting for speech recognises the Hindi full stop (।).
+
 ## [0.5.2] - 2026-10-28
 
 ### Added

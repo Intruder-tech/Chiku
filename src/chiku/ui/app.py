@@ -27,7 +27,8 @@ def _windows_identity() -> object | None:
     return ctypes.windll.kernel32.CreateMutexW(None, False, APP_MUTEX)
 
 
-def run_gui(settings: Settings, paths: AppPaths) -> int:
+def run_gui(settings: Settings, paths: AppPaths, background: bool = False) -> int:
+    """`background`: started at sign-in; stay in the tray unless first-run setup is needed."""
     mutex = _windows_identity()
     existing = QApplication.instance()
     app = existing if isinstance(existing, QApplication) else QApplication(sys.argv)
@@ -39,14 +40,18 @@ def run_gui(settings: Settings, paths: AppPaths) -> int:
     # One instance only: two copies would fight over the microphone.
     lock = QLockFile(str(paths.data_dir / "chiku.lock"))
     if not lock.tryLock(100):
-        QMessageBox.information(None, "Chiku", "Chiku is already running.")
+        if not background:
+            QMessageBox.information(None, "Chiku", "Chiku is already running.")
         return 0
 
     from chiku.ui.main_window import MainWindow
 
     win = MainWindow(settings, paths)
-    win.show()
-    QTimer.singleShot(400, win.maybe_onboard)
+    if background and settings.onboarding_done:
+        win.start_in_background()
+    else:
+        win.show()
+        QTimer.singleShot(400, win.maybe_onboard)
     code = app.exec()
     lock.unlock()
     if mutex:

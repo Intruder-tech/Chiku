@@ -92,10 +92,36 @@ below.
 - **Install and update apps (winget).** "Install VLC", "uninstall Zoom", "check for
   updates". You confirm every change in a dialog showing the exact package. Only official
   winget and Microsoft Store sources are used.
-- **Chat-app layout and compact mode.** Sidebar pages, chat bubbles with timestamps, and a
-  floating always-on-top Chiku (Ctrl+Shift+Space). Warm light and dark themes follow Windows.
+- **Pro workspace.** Three panes:
+  - **Left:** pages (Chat, Profile, Apps, Memory, Activity, Settings) and your chats. "+ New"
+    or Ctrl+N starts a chat; right-click deletes one.
+  - **Centre:** the chat or the current page.
+  - **Right:** the live mascot and voice level, component status, the sources of the last
+    answer and Chiku's recent actions. Ctrl+. shows or hides it; it hides itself in narrow
+    windows.
+
+  **Ctrl+K** opens a command palette for pages, actions, any Settings tab, past chats and
+  "Open <app>" (apps open through the same permission-checked, logged path as voice).
+  Chats stay in memory unless you tick Settings → Privacy → "Keep conversation history".
+- **Profile.** Your name and how to pronounce it (with a "Hear it" button), an optional
+  picture, interests, answer length and tone, reply language and voices. It also shows what
+  Chiku remembers (by category) and usage counted from the local action log (apps opened,
+  searches, installs, …). Export my data and Delete my data are here too.
+- **Apps page.** Installed apps (filterable), available updates and "Get apps" search, all
+  through winget. Install, update and uninstall use the same tools as voice requests, so you
+  confirm each one and it is logged.
+- **Minimised modes.** Warm light and dark themes follow Windows. Minimise
+  (Ctrl+Shift+Space) turns Chiku into a
+  **notch** hanging from the top of the screen: mascot, live state, level meter and mic;
+  hover or click it for the last reply and quick actions. Drag it to any spot on any monitor
+  and it snaps to that screen's top edge; the position is remembered per screen. A floating
+  card is the alternative style (Settings → Persona → Minimised Chiku).
 - **Tool switches.** Settings → Tools turns any single ability off; that tool is hidden from the
   AI and refused.
+- **Wake word and background mode** (opt-in, Settings → Background). With the mic off, say
+  "Hey Chiku" or "Wake up": she chimes and listens. Speech is checked on this PC by a small
+  Whisper model and then discarded. The tray icon shows a green dot while she listens for her
+  name, listening pauses on the lock screen, and she can start in the tray when you sign in.
 
 ### Web search setup (one time)
 
@@ -118,6 +144,8 @@ links you give her, and she tells you how to add the key when you ask something 
 | `qwen3:4b-instruct-2507-q4_K_M` | 2.5 GB disk, ~3.9 GB VRAM at 8k context | language model | Apache-2.0 |
 | Kokoro-82M + voices | 338 MB | female voice (CPU) | Apache-2.0 |
 | Whisper `small.en` (CTranslate2) | 484 MB | speech-to-text | MIT |
+| Whisper `small` multilingual (optional, Settings → Languages) | 484 MB | Hindi and other languages | MIT |
+| Whisper `tiny.en` (optional, Settings → Background) | 75 MB | wake word | MIT |
 | Silero VAD v5 | 2 MB | voice activity detection | MIT |
 
 Models are stored in `%LOCALAPPDATA%\Chiku\models` (not in this folder, so OneDrive doesn't sync
@@ -160,6 +188,7 @@ ollama pull qwen3:4b-instruct-2507-q4_K_M
 ```
 
 Turn on the **Mic** button (Ctrl+M) and talk. Esc or **Stop** interrupts. You can also type.
+`--background` starts Chiku in the tray without a window (this is what sign-in autostart uses).
 
 ### Command-line tools
 
@@ -187,7 +216,11 @@ Settings are edited in the app (Settings, Ctrl+,) and saved to `%APPDATA%\Chiku\
 Notable ones:
 
 - `stt.device`: `auto` (GPU if the CUDA libraries are installed, else CPU), `cuda`, `cpu`.
-- `tts.voice`: any Kokoro female voice, e.g. `af_heart` (default), `af_bella`, `bf_emma`, `hf_alpha`.
+- `tts.voice`: the English voice, any Kokoro female voice, e.g. `af_heart` (default), `af_bella`,
+  `bf_emma`. `tts.voices` sets other languages' voices, e.g. `{"hi": "hf_beta"}`.
+- `stt.model` / `stt.language`: `small.en` + `en` (English only, default) or `small` + `auto`
+  (detect the language of each utterance). `stt.preferred_languages` are the languages you
+  speak; unsure detections fall back to them.
 - `llm.model`: any Ollama model that supports tools. Instruct (non-reasoning) models answer
   faster; "thinking" models work but start speaking later.
 - `llm.ollama_url`: must be on this computer unless `allow_remote_ollama` is true.
@@ -196,6 +229,11 @@ Notable ones:
 - `persona.*`: your name, tone, reply length, language, pronunciation fixes, extra preferences.
 - `permissions.*`: auto-open apps, always confirm sensitive apps, URL domains that open without
   asking.
+- `conversations.keep_history`: save chats to `%LOCALAPPDATA%\Chiku\conversations.json`
+  (off by default; turning it off deletes the file). `persona.interests`: topics Chiku can
+  draw examples from.
+- `wake.enabled`: listen for "Hey Chiku" / "Wake up" while the mic is off (needs Whisper
+  `tiny.en`). `wake.follow_up_s`: how long she keeps listening after waking or answering.
 
 No API keys are needed. If cloud providers are added later, keys go to Windows Credential
 Manager via `chiku.credentials`, never into files. Set `CHIKU_HOME` to keep all data in one
@@ -204,7 +242,7 @@ folder (portable mode).
 ## Tests
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest                         # 283 unit tests, no hardware needed
+.\.venv\Scripts\python.exe -m pytest                         # 433 unit tests, no hardware needed
 .\.venv\Scripts\python.exe -m pytest -m "models or ollama or system"   # real models, Ollama, Recycle Bin
 .\.venv\Scripts\ruff.exe check src tests
 .\.venv\Scripts\mypy.exe
@@ -225,8 +263,19 @@ Manual, hardware-dependent checks are listed in [docs/TESTING.md](docs/TESTING.m
 - **No acoustic echo cancellation.** With laptop speakers, Chiku's own voice can trigger
   barge-in or be picked up as speech. Barge-in uses a stricter detector while she talks, but
   headphones are recommended. Turning barge-in off makes her ignore the mic while speaking.
-- English speech recognition only (`*.en` Whisper models). Kokoro has Hindi and other female
-  voices, but the persona/STT pipeline is English-first.
+- Languages: speech in any language Whisper knows is understood once the multilingual model is
+  installed, but replies are only *spoken* in English, Hindi, Spanish, French, Italian,
+  Portuguese, Japanese and Chinese; other languages get text replies. Hindi pronunciation
+  comes from espeak-ng and is understandable but not native-sounding. Romanised Hindi
+  ("Hinglish") from the model is read by the English voice. App names said in Hindi script
+  (e.g. "क्रोम खोलो") skip the instant command path and go through the language model. The
+  4B local model's answers in Hindi are less accurate than its English ones.
+- Wake word: measured on synthesized speech, 17 of 18 wake phrases were recognised, with no
+  false wakes on 16 ordinary sentences or on noise; real voices and rooms will differ. Only
+  "Hey Chiku" and "Wake up" are supported, in English. While waiting, CPU use was about 5% of
+  one core in silence and about 35% of one core during non-stop speech nearby (TV,
+  conversation), because each speech segment is checked. A dedicated wake-word model
+  (openWakeWord) would be lighter; it may replace this later.
 - The first GPU load of Whisper on a new driver/GPU can take ~1 minute (CUDA kernel compile);
   later starts take seconds.
 - App launch verification looks for a new matching process or window within 8 s. Apps that

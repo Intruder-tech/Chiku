@@ -133,3 +133,23 @@ def test_real_ollama_stream() -> None:
     text = "".join(c.text for c in p.stream_chat(
         [ChatMessage("user", "Reply with exactly: ready")], None, CancelToken()))
     assert "ready" in text.lower() and "<think>" not in text
+
+
+@pytest.mark.models
+def test_hindi_round_trip_with_multilingual_whisper(real_paths: AppPaths) -> None:
+    """Kokoro's Hindi voice speaks; multilingual Whisper detects Hindi and transcribes it."""
+    from chiku.config import STTSettings
+    from chiku.stt.whisper import WhisperSTT
+    from chiku.tts.kokoro import KokoroTTS
+
+    if not models.whisper_present(real_paths.models_dir, "small"):
+        pytest.skip("multilingual Whisper small not downloaded")
+    tts = KokoroTTS(Settings().tts, real_paths.models_dir)
+    stt = WhisperSTT(STTSettings(model="small", language="auto"), real_paths.models_dir)
+    hindi = tts.synthesize("नमस्ते, आज मौसम बहुत अच्छा है।", voice="hf_alpha")
+    tr = stt.transcribe(resample(hindi, tts.sample_rate, 16000))
+    # Whisper small often writes मौसम ("weather") as मोसम; both are the word that was spoken
+    assert tr.language == "hi" and ("मौसम" in tr.text or "मोसम" in tr.text)
+    english = tts.synthesize("Please open Google Chrome.")
+    tr = stt.transcribe(resample(english, tts.sample_rate, 16000))
+    assert tr.language == "en" and "chrome" in tr.text.lower()

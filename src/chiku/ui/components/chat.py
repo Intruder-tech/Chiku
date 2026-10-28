@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLayoutItem,
     QScrollArea,
     QSizePolicy,
     QVBoxLayout,
@@ -26,8 +27,23 @@ from chiku.ui import theme
 from chiku.ui.components import label, named
 
 
+def _dispose(item: QLayoutItem | None) -> None:
+    if item is None:
+        return
+    w = item.widget()
+    if w is not None:
+        w.hide()  # gone now; the actual delete waits for the event loop
+        w.deleteLater()
+        return
+    lay = item.layout()
+    if lay is not None:
+        while lay.count():
+            _dispose(lay.takeAt(0))
+        lay.deleteLater()
+
+
 class Bubble(QFrame):
-    def __init__(self, role: str, source: str = ""):
+    def __init__(self, role: str, source: str = "", stamp: str = ""):
         super().__init__()
         self.role = role
         self.setObjectName("userBubble" if role == "user" else "assistantBubble")
@@ -38,7 +54,7 @@ class Bubble(QFrame):
         self.text.setTextFormat(Qt.TextFormat.PlainText)  # model output is never HTML
         self.text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         lay.addWidget(self.text)
-        stamp = datetime.now().strftime("%H:%M")
+        stamp = stamp or datetime.now().strftime("%H:%M")
         self.meta = label(stamp if role == "user" else f"{stamp} · {source}", "time")
         self.meta.setAlignment(Qt.AlignmentFlag.AlignRight if role == "user"
                                else Qt.AlignmentFlag.AlignLeft)
@@ -114,22 +130,42 @@ class ChatView(QScrollArea):
             row.addStretch(0)
         self.column.insertLayout(self.column.count() - 1, row)
 
+    def _bubble(self, role: str, source: str, stamp: str = "") -> Bubble:
+        self.welcome.hide()
+        b = Bubble(role, source, stamp)
+        b.setSizePolicy(QSizePolicy.Policy.Maximum if role == "user"
+                        else QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+        b.setMaximumWidth(max(260, int(self.viewport().width() * 0.82)))
+        self._insert(b, align_right=role == "user")
+        return b
+
     def show_message(self, ev: Message) -> None:
         if ev.role == "notice":
             self.add_line(ev.text, "notice")
             return
-        self.welcome.hide()
         b = self.bubbles.get(ev.id)
         if b is None:
-            b = Bubble(ev.role, ev.source)
-            b.setSizePolicy(QSizePolicy.Policy.Maximum if ev.role == "user"
-                            else QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
-            b.setMaximumWidth(max(260, int(self.viewport().width() * 0.82)))
-            self.bubbles[ev.id] = b
-            self._insert(b, align_right=ev.role == "user")
+            b = self.bubbles[ev.id] = self._bubble(ev.role, ev.source)
         b.set_text(ev.text)
         if ev.final and ev.sources:
             b.add_sources(ev.sources, self.on_link)
+
+    def add_entry(self, role: str, text: str, source: str = "",
+                  sources: list[dict[str, str]] | None = None, stamp: str = "") -> None:
+        """Show a message from a saved conversation."""
+        b = self._bubble(role, source, stamp)
+        b.set_text(text)
+        if sources:
+            b.add_sources(sources, self.on_link)
+
+    def clear(self) -> None:
+        """Empty the transcript (switching conversations) and show the welcome card again."""
+        col = self.column
+        while col.count() > 2:  # keep the welcome card (first) and the stretch (last)
+            item = col.takeAt(1)
+            _dispose(item)
+        self.bubbles.clear()
+        self.welcome.show()
 
     def show_tool(self, ev: ToolActivity) -> None:
         if ev.status != "running":

@@ -57,7 +57,8 @@ SILERO_VAD = ModelFile(
 
 FILES: tuple[ModelFile, ...] = (KOKORO_MODEL, KOKORO_VOICES, SILERO_VAD)
 
-WHISPER_SIZES_MB = {"tiny.en": 75, "base.en": 145, "small.en": 484, "medium.en": 1530}
+WHISPER_SIZES_MB = {"tiny.en": 75, "base.en": 145, "small.en": 484, "medium.en": 1530,
+                    "tiny": 75, "base": 145, "small": 484, "medium": 1530}
 
 
 def whisper_dir(models_dir: Path, name: str) -> Path:

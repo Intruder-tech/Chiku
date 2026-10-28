@@ -97,7 +97,8 @@ class SentenceChunker:
 
     def _find_cut(self) -> int | None:
         buf = self._buf
-        for m in re.finditer(r"[.!?…]+[\"')\]]*(?=\s)|\n+", buf):
+        # "।" and "॥" end Hindi sentences; Hindi often ends a reply without trailing space.
+        for m in re.finditer(r"[.!?…।॥]+[\"')\]]*(?=\s)|[।॥]+$|\n+", buf):
             end = m.end()
             if m.group().startswith("\n"):
                 return end

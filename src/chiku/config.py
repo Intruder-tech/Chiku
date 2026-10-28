@@ -38,18 +38,29 @@ class AudioSettings(BaseModel):
     barge_in_min_ms: int = Field(350, ge=100, le=2000)
 
 
+WhisperModelName = Literal["tiny.en", "base.en", "small.en", "medium.en",
+                           "tiny", "base", "small", "medium"]
+
+
 class STTSettings(BaseModel):
-    model: Literal["tiny.en", "base.en", "small.en", "medium.en"] = "small.en"
+    # "*.en" models understand English only; the others are multilingual.
+    model: WhisperModelName = "small.en"
     # "auto": NVIDIA GPU when the CUDA libraries are installed, otherwise CPU.
     device: Literal["cpu", "cuda", "auto"] = "auto"
     compute_type: str = "int8"  # CPU compute type; CUDA always uses float16
-    language: str = "en"
+    # "auto" (multilingual models only): detect the language of each utterance.
+    language: str = Field("en", pattern=r"^(auto|[a-z]{2,3})$")
+    # The user's own languages: low-confidence detections fall back to the likeliest of these.
+    preferred_languages: list[str] = Field(default_factory=lambda: ["en", "hi"], max_length=8)
     cpu_threads: int = Field(default_factory=lambda: min(16, os.cpu_count() or 4), ge=1, le=64)
 
 
 class TTSSettings(BaseModel):
     engine: Literal["kokoro"] = "kokoro"
-    voice: str = "af_heart"
+    voice: str = "af_heart"  # English voice
+    # Voice per other language, e.g. {"hi": "hf_beta"}; unset languages use chiku.language's
+    # defaults, and languages with no Kokoro voice are answered in text.
+    voices: dict[str, str] = Field(default_factory=dict)
     speed: float = Field(1.0, ge=0.5, le=2.0)
     lang: str = "en-us"
 
@@ -115,9 +126,29 @@ class MemorySettings(BaseModel):
     max_in_prompt: int = Field(40, ge=0, le=200)
 
 
+class ConversationSettings(BaseModel):
+    # Off by default: chats live in memory and are gone when Chiku closes.
+    keep_history: bool = False
+    max_saved: int = Field(50, ge=1, le=500)
+
+
+class WakeSettings(BaseModel):
+    # Opt-in: while the mic is off, listen for "Hey Chiku" / "Wake up" (checked on this
+    # computer, nothing kept). Closing the window then keeps Chiku running in the tray.
+    enabled: bool = False
+    # After waking, keep listening this long after the last thing said or answered.
+    follow_up_s: int = Field(20, ge=5, le=300)
+
+
 class UISettings(BaseModel):
     theme: Literal["system", "light", "dark"] = "system"
-    start_compact: bool = False  # open as the small floating mascot window
+    start_compact: bool = False  # open minimised (in the mini_mode style)
+    # Minimised Chiku: a notch hanging from the top edge of a screen, or a floating card.
+    mini_mode: Literal["notch", "card"] = "notch"
+    # Notch position per screen (screen name -> centre as a fraction of the screen's width),
+    # and the screen it was last on.
+    notch_positions: dict[str, float] = Field(default_factory=dict)
+    notch_screen: str | None = None
 
 
 class ToolSettings(BaseModel):
@@ -155,6 +186,8 @@ class Settings(BaseModel):
     memory: MemorySettings = Field(default_factory=MemorySettings)
     tools: ToolSettings = Field(default_factory=ToolSettings)
     ui: UISettings = Field(default_factory=UISettings)
+    wake: WakeSettings = Field(default_factory=WakeSettings)
+    conversations: ConversationSettings = Field(default_factory=ConversationSettings)
 
 
 def is_loopback_url(url: str) -> bool:

@@ -28,7 +28,9 @@ from chiku.tools.system_info import SystemInfoTool
 from chiku.tools.web import OpenUrlTool
 from chiku.tools.windows_ctl import Win32Backend, WindowBackend, window_tools
 from chiku.tts.kokoro import KokoroTTS
+from chiku.wake import WakeSpotter
 from chiku.web.search import BRAVE_KEY_NAME, BraveSearch, SearchProvider
+from chiku.winsession import screen_locked
 
 
 class UnavailableProvider(LLMProvider):
@@ -146,6 +148,8 @@ def build_assistant(
         catalog=catalog,
         memory=memory,
         on_event=on_event,
+        make_wake=lambda: WakeSpotter(paths.models_dir),
+        screen_locked=screen_locked,
     )
     holder["a"] = assistant
     return assistant

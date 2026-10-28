@@ -17,8 +17,11 @@ Mode = Literal["idle", "input", "output"]
 class Waveform(QWidget):
     BARS = 48
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent: QWidget | None = None, bars: int = BARS,
+                 background: str = "BG"):
         super().__init__(parent)
+        self.BARS = bars
+        self.background = background  # theme colour name behind the bars
         self._levels: deque[float] = deque([0.0] * self.BARS, maxlen=self.BARS)
         self._mode: Mode = "idle"
         self.setMinimumHeight(64)
@@ -39,7 +42,7 @@ class Waveform(QWidget):
     def paintEvent(self, _event) -> None:  # noqa: ANN001, N802 - Qt override
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.fillRect(self.rect(), QColor(theme.BG))
+        p.fillRect(self.rect(), QColor(getattr(theme, self.background)))
         w, h = self.width(), self.height()
         gap = 3.0
         bar_w = max(2.0, (w - gap * (self.BARS - 1)) / self.BARS)

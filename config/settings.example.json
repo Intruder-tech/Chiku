@@ -16,11 +16,16 @@
     "device": "auto",
     "compute_type": "int8",
     "language": "en",
+    "preferred_languages": [
+      "en",
+      "hi"
+    ],
     "cpu_threads": 16
   },
   "tts": {
     "engine": "kokoro",
     "voice": "af_heart",
+    "voices": {},
     "speed": 1.0,
     "lang": "en-us"
   },
@@ -45,7 +50,8 @@
     "response_length": "balanced",
     "language": "English",
     "pronunciations": {},
-    "extra_instructions": ""
+    "extra_instructions": "",
+    "interests": []
   },
   "permissions": {
     "auto_allow_open_apps": true,
@@ -82,5 +88,13 @@
   },
   "tools": {
     "disabled": []
+  },
+  "wake": {
+    "enabled": false,
+    "follow_up_s": 20
+  },
+  "conversations": {
+    "keep_history": false,
+    "max_saved": 50
   }
 }

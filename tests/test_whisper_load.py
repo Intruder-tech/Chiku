@@ -86,3 +86,42 @@ def test_reload_keeps_loaded_stt(harness) -> None:  # noqa: ANN001
     a.reload()
     assert wait_for(lambda: a._ready.is_set())
     assert a._stt is before  # same settings -> same (already loaded) instance
+
+
+class _Seg:
+    def __init__(self, text: str) -> None:
+        self.text, self.no_speech_prob, self.avg_logprob = text, 0.0, -0.2
+
+
+class _Info:
+    def __init__(self, language: str, prob: float) -> None:
+        self.language, self.language_probability = language, prob
+        self.all_language_probs = [(language, prob), ("hi", 0.3), ("en", 0.1)]
+
+
+class LangModel:
+    """Detects Urdu, as Whisper often does for spoken Hindi."""
+
+    def __init__(self) -> None:
+        self.languages: list[str | None] = []
+
+    def transcribe(self, audio: np.ndarray, language: str | None = None, **kw):  # noqa: ANN003, ANN201
+        self.languages.append(language)
+        detected = language or "ur"
+        return iter([_Seg("नमस्ते" if detected == "hi" else "نمستے")]), _Info(detected, 0.7)
+
+
+def test_auto_language_redecodes_in_users_language(tmp_path: Path) -> None:
+    s = w.WhisperSTT(STTSettings(model="small", language="auto",
+                                 preferred_languages=["en", "hi"]), tmp_path)
+    s._model = LangModel()
+    tr = s.transcribe(np.zeros(16000, dtype=np.float32))
+    assert tr.text == "नमस्ते" and tr.language == "hi"
+    assert s._model.languages == [None, "hi"]  # detect, then decode as Hindi
+
+
+def test_english_only_model_never_detects(tmp_path: Path) -> None:
+    s = w.WhisperSTT(STTSettings(model="small.en", language="auto"), tmp_path)
+    s._model = LangModel()
+    tr = s.transcribe(np.zeros(16000, dtype=np.float32))
+    assert s._model.languages == ["en"] and tr.language == "en"

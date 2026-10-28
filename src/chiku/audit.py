@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import threading
-from datetime import UTC, datetime
+from collections import Counter
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -20,6 +22,64 @@ def _shorten(value: Any, limit: int = 200) -> Any:
     if isinstance(value, list | tuple):
         return [_shorten(v, limit) for v in value[:20]]
     return value
+
+
+_FILE_TOOLS = frozenset({"find_files", "list_folder", "open_file", "read_text_file",
+                         "create_folder", "move_or_rename", "move_to_recycle_bin"})
+
+
+@dataclass
+class UsageStats:
+    actions: int = 0
+    apps_opened: int = 0
+    searches: int = 0
+    pages_read: int = 0
+    apps_installed: int = 0
+    apps_updated: int = 0
+    file_actions: int = 0
+    memories_saved: int = 0
+    last_7_days: int = 0
+    since: str = ""  # date of the oldest recorded action
+    top_apps: list[tuple[str, int]] = field(default_factory=list)
+
+
+def usage_stats(entries: list[dict[str, Any]], now: datetime | None = None) -> UsageStats:
+    """Counts of successful actions from the local action log (nothing else is tracked)."""
+    now = now or datetime.now(UTC)
+    s = UsageStats()
+    apps: Counter[str] = Counter()
+    for e in entries:
+        if not e.get("ok"):
+            continue
+        s.actions += 1
+        tool = e.get("tool", "")
+        raw = e.get("args")
+        args: dict[str, Any] = raw if isinstance(raw, dict) else {}
+        if tool == "open_app":
+            s.apps_opened += 1
+            apps[str(args.get("app_name", "")).strip().title()] += 1
+        elif tool == "web_search":
+            s.searches += 1
+        elif tool == "read_web_page":
+            s.pages_read += 1
+        elif tool == "install_package":
+            s.apps_installed += 1
+        elif tool == "update_package":
+            s.apps_updated += 1
+        elif tool in _FILE_TOOLS:
+            s.file_actions += 1
+        elif tool == "remember":
+            s.memories_saved += 1
+        try:
+            ts = datetime.fromisoformat(str(e.get("ts")))
+        except ValueError:
+            continue
+        if now - ts <= timedelta(days=7):
+            s.last_7_days += 1
+        if not s.since or ts.date().isoformat() < s.since:
+            s.since = ts.date().isoformat()
+    s.top_apps = [(name, n) for name, n in apps.most_common(5) if name]
+    return s
 
 
 class AuditLog:
@@ -57,6 +117,19 @@ class AuditLog:
         with self._lock:
             for p in (self.path, self.path.with_suffix(".1.jsonl")):
                 p.unlink(missing_ok=True)
+
+    def all(self) -> list[dict[str, Any]]:
+        """Every recorded action, oldest first (the rotated file, then the current one)."""
+        out: list[dict[str, Any]] = []
+        for p in (self.path.with_suffix(".1.jsonl"), self.path):
+            if not p.exists():
+                continue
+            for ln in p.read_text(encoding="utf-8").splitlines():
+                try:
+                    out.append(json.loads(ln))
+                except json.JSONDecodeError:
+                    continue
+        return out
 
     def tail(self, n: int = 50) -> list[dict[str, Any]]:
         if not self.path.exists():

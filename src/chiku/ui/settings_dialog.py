@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import os
 import re
+import threading
 
 from pydantic import ValidationError
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -28,17 +29,37 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from chiku import credentials
+from chiku import autostart, credentials, data_controls, models
 from chiku.assistant import Assistant
 from chiku.audio import devices
 from chiku.config import ALL_FOLDERS, Settings, is_loopback_url, save_settings
+from chiku.conversations import ConversationStore
+from chiku.language import DEFAULT_VOICES
 from chiku.llm.openai_compat import OPENAI_KEY_NAME
 from chiku.paths import AppPaths
+from chiku.wake import WAKE_MODEL
 from chiku.web.search import BRAVE_KEY_NAME
 
 _DEFAULT = "System default"
 _FALLBACK_VOICES = ["af_heart", "af_bella", "af_nicole", "af_sarah", "af_sky", "bf_emma",
                     "bf_isabella", "hf_alpha", "hf_beta"]
+
+
+_HINDI_SAMPLE = "नमस्ते, मैं चिकू हूँ। मैं हिंदी में भी बात कर सकती हूँ।"
+_LANGUAGE_MODES = [
+    ("en", "English only"),
+    ("auto", "Detect the language I speak (English, Hindi and more)"),
+    ("hi", "Hindi only"),
+]
+
+
+class _Download(QObject):
+    finished = Signal(str, bool)  # message, ok
+
+
+def multilingual_model(model: str) -> str:
+    """Multilingual Whisper of the same size: "small.en" -> "small"."""
+    return model.removesuffix(".en")
 
 
 def _note(text: str) -> QLabel:
@@ -49,16 +70,20 @@ def _note(text: str) -> QLabel:
 
 
 class SettingsDialog(QDialog):
-    def __init__(self, assistant: Assistant, paths: AppPaths, parent: QWidget | None = None):
+    def __init__(self, assistant: Assistant, paths: AppPaths, parent: QWidget | None = None,
+                 conversations: ConversationStore | None = None):
         super().__init__(parent)
         self.assistant = assistant
         self.paths = paths
+        self.conversations = conversations
         self.s = assistant.settings
         self.setWindowTitle("Chiku settings")
         self.resize(520, 560)
-        tabs = QTabWidget()
+        tabs = self.tabs = QTabWidget()
         tabs.addTab(self._audio_tab(), "Audio")
         tabs.addTab(self._voice_tab(), "Voice")
+        tabs.addTab(self._language_tab(), "Languages")
+        tabs.addTab(self._background_tab(), "Background")
         tabs.addTab(self._ai_tab(), "AI model")
         tabs.addTab(self._persona_tab(), "Persona")
         tabs.addTab(self._web_tab(), "Web")
@@ -130,8 +155,178 @@ class SettingsDialog(QDialog):
         )
         f.addRow(test)
         f.addRow(_note("Voices are Kokoro-82M female voices. 'af_' = American English, 'bf_' = "
-                       "British English, 'hf_' = Hindi. Generated on this computer."))
+                       "British English. Voices for other languages are on the Languages "
+                       "tab. Generated on this computer."))
         return w
+
+    def _language_tab(self) -> QWidget:
+        w = QWidget()
+        f = QFormLayout(w)
+        stt = self.s.stt
+        self.multi_name = multilingual_model(stt.model)
+        self.lang_mode = QComboBox()
+        for code, label in _LANGUAGE_MODES:
+            self.lang_mode.addItem(label, code)
+        current = "en" if stt.model.endswith(".en") else stt.language
+        self.lang_mode.setCurrentIndex(max(0, self.lang_mode.findData(current)))
+        f.addRow("Understand", self.lang_mode)
+        self.lang_download = QPushButton(
+            f"Download multilingual speech model ({self.multi_name}, "
+            f"~{models.WHISPER_SIZES_MB.get(self.multi_name, 500)} MB)")
+        self.lang_download.clicked.connect(self._download_multilingual)
+        self.lang_status = _note("")
+        f.addRow(self.lang_download)
+        f.addRow(self.lang_status)
+        self._dl = _Download()
+        self._dl.finished.connect(self._downloaded)
+        self._refresh_language_model()
+        self.lang_en = QCheckBox("English")
+        self.lang_hi = QCheckBox("Hindi")
+        self.lang_en.setChecked("en" in stt.preferred_languages)
+        self.lang_hi.setChecked("hi" in stt.preferred_languages)
+        others = [c for c in stt.preferred_languages if c not in ("en", "hi")]
+        self.lang_other = QLineEdit(", ".join(others))
+        self.lang_other.setPlaceholderText("Other language codes, e.g. es, fr")
+        row = QHBoxLayout()
+        for widget in (self.lang_en, self.lang_hi, self.lang_other):
+            row.addWidget(widget)
+        f.addRow("Languages I speak", row)
+        self.hindi_voice = QComboBox()
+        self.hindi_voice.addItems(["hf_alpha", "hf_beta"])
+        self.hindi_voice.setCurrentText(self.s.tts.voices.get("hi", DEFAULT_VOICES["hi"]))
+        test = QPushButton("Test Hindi voice")
+        test.clicked.connect(lambda: self.assistant.preview_voice(
+            self.hindi_voice.currentText(), self.speed.value(), _HINDI_SAMPLE))
+        hv = QHBoxLayout()
+        hv.addWidget(self.hindi_voice, 1)
+        hv.addWidget(test)
+        f.addRow("Hindi voice", hv)
+        self.language = QLineEdit(self.s.persona.language)
+        f.addRow("Default reply language", self.language)
+        f.addRow(_note(
+            "Chiku replies in the language you use. She has voices for English, Hindi, "
+            "Spanish, French, Italian, Portuguese, Japanese and Chinese; in other languages she "
+            "replies in text. Detection happens on this computer. If it isn't sure which "
+            "language you spoke, it picks the likeliest of the languages you ticked above."))
+        return w
+
+    def _refresh_language_model(self) -> None:
+        have = models.whisper_present(self.paths.models_dir, self.multi_name)
+        self.lang_download.setVisible(not have)
+        model = self.lang_mode.model()
+        for i in range(self.lang_mode.count()):
+            if self.lang_mode.itemData(i) != "en":
+                model.item(i).setEnabled(have)  # type: ignore[attr-defined]
+        self.lang_status.setText("" if have else "Hindi and other languages need the "
+                                 "multilingual speech model. Nothing is downloaded until you "
+                                 "click the button.")
+
+    def _download_multilingual(self) -> None:
+        self.lang_download.setEnabled(False)
+        self.lang_status.setText(f"Downloading Whisper {self.multi_name} from Hugging Face…")
+        name, md, sig = self.multi_name, self.paths.models_dir, self._dl
+
+        def work() -> None:
+            try:
+                models.download_whisper(name, md, lambda _m: None)
+            except Exception as exc:  # network, disk
+                sig.finished.emit(f"Download failed: {exc}", False)
+                return
+            sig.finished.emit("Downloaded. Choose “Detect the language I speak” and save.", True)
+
+        threading.Thread(target=work, daemon=True, name="chiku-whisper-dl").start()
+
+    def _downloaded(self, message: str, ok: bool) -> None:
+        self.lang_download.setEnabled(True)
+        if ok:
+            self._refresh_language_model()
+            self.lang_mode.setCurrentIndex(self.lang_mode.findData("auto"))
+        self.lang_status.setText(message)
+
+    def _language_settings(self, data: dict) -> None:
+        stt = data["stt"]
+        mode = self.lang_mode.currentData()
+        if mode == "en" or not models.whisper_present(self.paths.models_dir, self.multi_name):
+            stt.update(model=self.multi_name + ".en", language="en")
+        else:
+            stt.update(model=self.multi_name, language=mode)
+        langs = [c for c, box in (("en", self.lang_en), ("hi", self.lang_hi)) if box.isChecked()]
+        langs += [c.strip().lower() for c in re.split(r"[,\s]+", self.lang_other.text())
+                  if re.fullmatch(r"[A-Za-z]{2,3}", c.strip())]
+        stt["preferred_languages"] = list(dict.fromkeys(langs))[:8] or ["en"]
+        data["tts"]["voices"] = {**data["tts"].get("voices", {}),
+                                 "hi": self.hindi_voice.currentText()}
+
+    def _background_tab(self) -> QWidget:
+        w = QWidget()
+        f = QFormLayout(w)
+        self.wake_on = QCheckBox("Listen for “Hey Chiku” or “Wake up” while the mic is off")
+        self.wake_on.setChecked(self.s.wake.enabled)
+        f.addRow(self.wake_on)
+        self.wake_download = QPushButton(
+            f"Download the wake word model ({WAKE_MODEL}, "
+            f"~{models.WHISPER_SIZES_MB[WAKE_MODEL]} MB)")
+        self.wake_download.clicked.connect(self._download_wake)
+        self.wake_status = _note("")
+        f.addRow(self.wake_download)
+        f.addRow(self.wake_status)
+        self._wake_dl = _Download()
+        self._wake_dl.finished.connect(self._wake_downloaded)
+        self.follow_up = QSpinBox()
+        self.follow_up.setRange(5, 300)
+        self.follow_up.setSuffix(" s")
+        self.follow_up.setValue(self.s.wake.follow_up_s)
+        f.addRow("After waking, keep listening for", self.follow_up)
+        self.autostart = QCheckBox("Start Chiku in the background when I sign in to Windows")
+        self.autostart.setChecked(autostart.is_enabled())
+        self.autostart.setEnabled(autostart.command() is not None)
+        f.addRow(self.autostart)
+        f.addRow(_note(
+            "With the wake word on, the microphone stays open while Chiku runs; the tray icon "
+            "shows a green dot. Speech is checked on this computer for the wake phrase and "
+            "then discarded: it is never saved, logged or sent. Listening pauses while the "
+            "screen is locked. Closing the window keeps Chiku in the tray; quit from the tray "
+            "icon's menu."))
+        self._refresh_wake_model()
+        return w
+
+    def _refresh_wake_model(self) -> None:
+        have = models.whisper_present(self.paths.models_dir, WAKE_MODEL)
+        self.wake_download.setVisible(not have)
+        self.wake_on.setEnabled(have)
+        if not have:
+            self.wake_on.setChecked(False)
+            self.wake_status.setText("The wake word needs a small English speech model. "
+                                     "Nothing is downloaded until you click the button.")
+
+    def _download_wake(self) -> None:
+        self.wake_download.setEnabled(False)
+        self.wake_status.setText(f"Downloading Whisper {WAKE_MODEL} from Hugging Face…")
+        md, sig = self.paths.models_dir, self._wake_dl
+
+        def work() -> None:
+            try:
+                models.download_whisper(WAKE_MODEL, md, lambda _m: None)
+            except Exception as exc:  # network, disk
+                sig.finished.emit(f"Download failed: {exc}", False)
+                return
+            sig.finished.emit("Downloaded. Tick the box above and save.", True)
+
+        threading.Thread(target=work, daemon=True, name="chiku-wake-dl").start()
+
+    def _wake_downloaded(self, message: str, ok: bool) -> None:
+        self.wake_download.setEnabled(True)
+        if ok:
+            self._refresh_wake_model()
+            self.wake_on.setChecked(True)
+        self.wake_status.setText(message)
+
+    def _apply_autostart(self) -> None:
+        if self.autostart.isEnabled() and self.autostart.isChecked() != autostart.is_enabled():
+            try:
+                autostart.set_enabled(self.autostart.isChecked())
+            except OSError as exc:
+                QMessageBox.warning(self, "Chiku", f"Couldn't change the sign-in setting: {exc}")
 
     def _ai_tab(self) -> QWidget:
         w = QWidget()
@@ -242,8 +437,6 @@ class SettingsDialog(QDialog):
         self.length.addItems(["brief", "balanced", "detailed"])
         self.length.setCurrentText(p.response_length)
         f.addRow("Reply length", self.length)
-        self.language = QLineEdit(p.language)
-        f.addRow("Language", self.language)
         self.pron = QPlainTextEdit("\n".join(f"{k}={v}" for k, v in p.pronunciations.items()))
         self.pron.setPlaceholderText("One per line: word=how to say it")
         self.pron.setMaximumHeight(80)
@@ -257,7 +450,12 @@ class SettingsDialog(QDialog):
             self.theme.addItem(text, key)
         self.theme.setCurrentIndex(max(0, self.theme.findData(self.s.ui.theme)))
         f.addRow("Theme", self.theme)
-        self.start_compact = QCheckBox("Start in compact mode (small floating Chiku)")
+        self.mini_mode = QComboBox()
+        self.mini_mode.addItem("Notch at the top of the screen (drag it to any monitor)", "notch")
+        self.mini_mode.addItem("Floating card", "card")
+        self.mini_mode.setCurrentIndex(max(0, self.mini_mode.findData(self.s.ui.mini_mode)))
+        f.addRow("Minimised Chiku", self.mini_mode)
+        self.start_compact = QCheckBox("Start minimised")
         self.start_compact.setChecked(self.s.ui.start_compact)
         f.addRow(self.start_compact)
         return w
@@ -362,7 +560,10 @@ class SettingsDialog(QDialog):
         self.mem_ask.setChecked(mem.ask_before_model_saves)
         self.mem_cloud = QCheckBox("Include memories when using a cloud provider")
         self.mem_cloud.setChecked(mem.share_with_cloud)
-        for b in (self.mem_on, self.mem_ask, self.mem_cloud):
+        self.keep_history = QCheckBox("Keep conversation history on this computer (so chats "
+                                      "are still there after Chiku restarts)")
+        self.keep_history.setChecked(self.s.conversations.keep_history)
+        for b in (self.mem_on, self.mem_ask, self.mem_cloud, self.keep_history):
             v.addWidget(b)
         self.auto_apps = QCheckBox("Open apps without asking")
         self.auto_apps.setChecked(self.s.permissions.auto_allow_open_apps)
@@ -397,11 +598,13 @@ class SettingsDialog(QDialog):
         self.domains.setMaximumHeight(110)
         v.addWidget(self.domains)
         v.addWidget(_note(
-            "Privacy: the microphone only runs while the Mic button is on. Audio is processed "
+            "Privacy: the microphone only runs while the Mic button is on, or while the wake "
+            "word is on (Background tab; the tray icon shows a green dot). Audio is processed "
             "in memory and never saved. Speech recognition, the voice and the language model "
             "all run on this computer; only web searches (the query words) leave it. "
-            "Conversations are not written to disk or logs; every action Chiku takes is "
-            "recorded in a local action log. Deleting always goes to the Recycle Bin."
+            "Conversations are not written to disk or logs unless you keep conversation "
+            "history (above; turning it off deletes the saved file). Every action Chiku takes "
+            "is recorded in a local action log. Deleting always goes to the Recycle Bin."
         ))
         row = QHBoxLayout()
         log_btn = QPushButton("Open action log folder")
@@ -428,20 +631,14 @@ class SettingsDialog(QDialog):
     def _wipe(self) -> None:
         if QMessageBox.question(
             self, "Chiku",
-            "Delete all memories, the action history, logs and the current conversation? "
-            "Settings, stored API keys and downloaded models are kept.",
+            "Delete all memories, the action history, saved conversations, your profile "
+            "picture, logs and the current conversation? Settings, stored API keys and "
+            "downloaded models are kept.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         ) != QMessageBox.StandardButton.Yes:
             return
-        self.assistant.clear_history()
-        if self.assistant.memory is not None:
-            self.assistant.memory.clear()
-        audit = self.assistant._executor.audit  # noqa: SLF001
-        if audit is not None:
-            audit.clear()
-        for f in self.paths.logs_dir.glob("chiku.log.*"):
-            f.unlink(missing_ok=True)
+        data_controls.wipe(self.assistant, self.paths, self.conversations)
         QMessageBox.information(self, "Chiku", "Done. (The current log file is emptied when "
                                 "Chiku restarts.)")
 
@@ -462,6 +659,7 @@ class SettingsDialog(QDialog):
             barge_in=self.barge.isChecked(),
         )
         data["tts"].update(voice=self.voice.currentText(), speed=round(self.speed.value(), 2))
+        self._language_settings(data)
         data["llm"].update(
             provider=self.provider.currentData(),
             ollama_url=self.url.text().strip(),
@@ -473,6 +671,7 @@ class SettingsDialog(QDialog):
             openai_model=self.oa_model.text().strip(),
             allow_cloud=self.cloud.isChecked(),
         )
+        data["conversations"]["keep_history"] = self.keep_history.isChecked()
         data["memory"].update(
             enabled=self.mem_on.isChecked(),
             ask_before_model_saves=self.mem_ask.isChecked(),
@@ -486,7 +685,10 @@ class SettingsDialog(QDialog):
                 if k.strip() and val.strip():
                     pron[k.strip()] = val.strip()
         data["ui"].update(theme=self.theme.currentData(),
-                          start_compact=self.start_compact.isChecked())
+                          start_compact=self.start_compact.isChecked(),
+                          mini_mode=self.mini_mode.currentData())
+        data["wake"].update(enabled=self.wake_on.isEnabled() and self.wake_on.isChecked(),
+                            follow_up_s=self.follow_up.value())
         data["persona"].update(
             user_name=self.user_name.text().strip() or None,
             tone=self.tone.text().strip() or self.s.persona.tone,
@@ -534,4 +736,12 @@ class SettingsDialog(QDialog):
             return
         save_settings(new, self.paths.settings_file)
         self.assistant.apply_settings(new)
+        self._apply_autostart()
+        if new.conversations.keep_history:
+            if self.conversations is not None:
+                self.conversations.save()
+        elif self.conversations is not None:
+            self.conversations.forget_saved()
+        else:
+            self.paths.conversations_file.unlink(missing_ok=True)
         self.accept()

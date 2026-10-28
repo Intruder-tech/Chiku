@@ -33,6 +33,7 @@ from chiku.tools.system_info import SystemInfoTool
 from chiku.tools.web import OpenUrlTool
 from chiku.tools.windows_ctl import AppWindow, window_tools
 from chiku.tts.kokoro import TTSError
+from chiku.wake import WakeHit
 from chiku.web.fetch import Page
 from chiku.web.search import SearchResult
 
@@ -54,8 +55,9 @@ def wait_for(pred: Callable[[], bool], timeout: float = 5.0) -> bool:
 class FakeSTT:
     name = "fake stt"
 
-    def __init__(self, text: str = "hello there") -> None:
+    def __init__(self, text: str = "hello there", language: str = "en") -> None:
         self.text = text
+        self.language = language
         self.calls = 0
 
     def load(self) -> None:
@@ -63,7 +65,7 @@ class FakeSTT:
 
     def transcribe(self, audio: np.ndarray) -> Transcript:
         self.calls += 1
-        return Transcript(self.text, len(audio) / 16000, 0.01)
+        return Transcript(self.text, len(audio) / 16000, 0.01, self.language, 0.95)
 
 
 class FakeTTS:
@@ -73,6 +75,7 @@ class FakeTTS:
     def __init__(self, fail: bool = False) -> None:
         self.settings = TTSSettings()
         self.spoken: list[str] = []
+        self.voices_used: list[str | None] = []  # None = the configured (English) voice
         self.fail = fail
 
     def load(self) -> None:
@@ -86,6 +89,7 @@ class FakeTTS:
         if self.fail:
             raise TTSError("voice broke")
         self.spoken.append(text)
+        self.voices_used.append(voice)
         return np.full(2400, 0.1, dtype=np.float32)
 
 
@@ -199,6 +203,23 @@ class FakeCapture:
             return np.zeros(512, dtype=np.float32)
         time.sleep(timeout)
         return None
+
+
+class FakeWake:
+    """Wake detector: each check consumes the next scripted result (None = not the phrase)."""
+
+    name = "fake wake"
+
+    def __init__(self, hits: list[WakeHit | None] | None = None) -> None:
+        self.hits = list(hits or [])
+        self.checked = 0
+
+    def load(self) -> None:
+        pass
+
+    def check(self, audio: np.ndarray) -> WakeHit | None:
+        self.checked += 1
+        return self.hits.pop(0) if self.hits else None
 
 
 FAKE_APPS = [
@@ -329,6 +350,8 @@ class Harness:
         self.executor = ToolExecutor(self.registry, audit=self.audit,
                                      disabled=lambda: self.settings.tools.disabled)
         self.catalog = catalog
+        self.wake: FakeWake | None = None
+        self.locked = False  # screen lock state seen by the assistant
         self.assistant: Assistant | None = None
 
     def build(self) -> Assistant:
@@ -349,6 +372,8 @@ class Harness:
             catalog=self.catalog,
             memory=self.memory,
             on_event=self.events.append,
+            make_wake=(lambda: self.wake) if self.wake is not None else None,
+            screen_locked=lambda: self.locked,
         )
         return self.assistant
 
@@ -357,6 +382,7 @@ class Harness:
         a.start()
         assert wait_for(lambda: a._ready.is_set())
         self.tts.spoken.clear()  # drop the warm-up synthesis
+        self.tts.voices_used.clear()
         return a
 
     def of(self, kind: type) -> list:

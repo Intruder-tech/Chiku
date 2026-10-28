@@ -8,6 +8,7 @@ falls through to the LLM, which can still call the same tools.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Literal
 
@@ -126,6 +127,7 @@ def to_note(fact: str) -> str:
 class Intent:
     kind: IntentKind
     target: str
+    lang: str = "en"  # language the command was given in; acknowledgements use it
 
 
 def _app_target(m: re.Match[str] | None) -> str | None:
@@ -173,6 +175,12 @@ def research_query(text: str) -> str | None:
 
 
 def parse_command(text: str) -> Intent | None:
+    """English commands first (Hindi patterns accept English loanwords like "next song"),
+    then Hindi."""
+    return _parse_english(text) or parse_hindi(text)
+
+
+def _parse_english(text: str) -> Intent | None:
     m = _REMEMBER.match(text)
     if m and not _NOT_A_FACT.match(m.group("fact")):
         # "I'm vegetarian and I live in Pune" -> two separate memories, so each can be
@@ -205,4 +213,99 @@ def parse_command(text: str) -> Intent | None:
     t = _app_target(_CLOSE.match(text))
     if t:
         return Intent("close_app", t)
+    return None
+
+
+# -- Hindi (Devanagari as Whisper writes it, and romanised as people type it) -------------
+
+_NUKTA = "़"
+
+
+def _fold(text: str) -> str:
+    # NFC writes nukta letters as base letter + nukta, however they were typed.
+    return unicodedata.normalize("NFC", text)
+
+
+def _hi(pattern: str) -> re.Pattern[str]:
+    """Compile with an optional nukta after each letter that can take one, so words match
+    whether or not the nukta was written (Whisper and people both vary)."""
+    p = re.sub("([कखगजडढफ])", r"\1" + _NUKTA + "?",
+               _fold(pattern).replace(_NUKTA, ""))
+    return re.compile(p, re.I)
+
+
+_HI_START = (r"^\s*(?:(?:hey|hi|ok|okay|arey?|अरे|हे)[,\s]+)?(?:(?:chiku|चिकू|चीकू)[,!.:।\s]+)?"
+             r"(?:(?:please|zara|jara|प्लीज|ज़रा|जरा)\s+)?")
+_HI_END = r"(?:\s+(?:please|plz|na|zara|प्लीज|ना|ज़रा|जरा))*\s*[.!?।]*\s*$"
+_HI_OBJ = r"(?P<target>.+?)(?:\s+(?:app|ऐप|एप))?(?:\s+(?:ko|को))?"
+_HI_MUSIC = r"(?:gaana|gana|gaane|music|song|गाना|गाने|गीत|म्यूजिक|संगीत|सॉन्ग)"
+_HI_DO = r"(?:karo|kar\s+do|kardo|kijiye|करो|कर\s+दो|करिए|कीजिए)"
+
+_HI_MEDIA: list[tuple[re.Pattern[str], str]] = [
+    (_hi(_HI_START + _HI_MUSIC + r"\s+(?:roko|rok\s+do|band\s+" + _HI_DO + r"|pause\s+" + _HI_DO
+         + r"|रोको|रोक\s+दो|बंद\s+" + _HI_DO + r"|बन्द\s+" + _HI_DO + r"|पॉज\s+" + _HI_DO + ")"
+         + _HI_END), "play_pause"),
+    (_hi(_HI_START + _HI_MUSIC + r"\s+(?:chalao|chala\s+do|bajao|baja\s+do|play\s+" + _HI_DO
+         + r"|चलाओ|चला\s+दो|बजाओ|बजा\s+दो|प्ले\s+" + _HI_DO + ")" + _HI_END), "play_pause"),
+    (_hi(_HI_START + r"(?:agla|next|अगला|नेक्स्ट)\s+" + _HI_MUSIC
+         + r"(?:\s+(?:chalao|lagao|bajao|चलाओ|लगाओ|बजाओ))?" + _HI_END), "next_track"),
+    (_hi(_HI_START + r"(?:pichhla|pichla|पिछला)\s+" + _HI_MUSIC
+         + r"(?:\s+(?:chalao|lagao|bajao|चलाओ|लगाओ|बजाओ))?" + _HI_END), "previous_track"),
+    (_hi(_HI_START + r"(?:awaaz|aawaz|awaz|awaj|volume|आवाज|वॉल्यूम)\s+(?:badhao|badha\s+do|"
+         r"tez\s+" + _HI_DO + r"|बढ़ाओ|बढाओ|बढ़ा\s+दो|बढा\s+दो|तेज\s+" + _HI_DO + ")" + _HI_END),
+     "volume_up"),
+    (_hi(_HI_START + r"(?:awaaz|aawaz|awaz|awaj|volume|आवाज|वॉल्यूम)\s+(?:kam\s+" + _HI_DO
+         + r"|ghatao|dheere\s+" + _HI_DO + r"|कम\s+" + _HI_DO + r"|घटाओ|धीमी\s+" + _HI_DO + ")"
+         + _HI_END), "volume_down"),
+    (_hi(_HI_START + r"(?:mute\s+" + _HI_DO + r"|म्यूट\s+" + _HI_DO + ")" + _HI_END), "mute"),
+]
+_HI_UNINSTALL = _hi(_HI_START + _HI_OBJ + r"\s+(?:uninstall\s+" + _HI_DO
+                    + r"|अनइंस्टॉल\s+" + _HI_DO + r"|अनइंस्टाल\s+" + _HI_DO + ")" + _HI_END)
+_HI_INSTALL = _hi(_HI_START + _HI_OBJ + r"\s+(?:install\s+" + _HI_DO + r"|इंस्टॉल\s+" + _HI_DO
+                  + r"|इंस्टाल\s+" + _HI_DO + ")" + _HI_END)
+_HI_OPEN = _hi(_HI_START + _HI_OBJ + r"\s+(?:kholo|khol\s+do|khol\s+de|kholiye|chalu\s+"
+               + _HI_DO + r"|open\s+" + _HI_DO + r"|start\s+" + _HI_DO
+               + r"|खोलो|खोल\s+दो|खोल\s+दे|खोलिए|खोलिये|चालू\s+" + _HI_DO + r"|ओपन\s+" + _HI_DO
+               + r"|स्टार्ट\s+" + _HI_DO + ")" + _HI_END)
+_HI_CLOSE = _hi(_HI_START + _HI_OBJ + r"\s+(?:band\s+" + _HI_DO + r"|बंद\s+" + _HI_DO
+                + r"|बन्द\s+" + _HI_DO + ")" + _HI_END)
+_HI_REMEMBER = [
+    _hi(_HI_START + r"(?:yaad\s+rakh(?:na|o|iye|iyega)|याद\s+रख(?:ना|ो|िए|िये|िएगा))\s+"
+        r"(?:ki|kee|कि|की)\s+(?P<fact>.{3,280}?)" + r"\s*[.!।]*\s*$"),
+    _hi(_HI_START + r"(?P<fact>.{3,280}?)[,\s]+(?:(?:ye|yeh|ये|यह)\s+)?"
+        r"(?:yaad\s+rakh(?:na|o|iye|iyega)|याद\s+रख(?:ना|ो|िए|िये|िएगा))" + _HI_END),
+]
+_HI_FORGET = _hi(_HI_START + r"(?P<fact>.{3,200}?)\s+(?:(?:wali|wala|वाली|वाला)\s+(?:baat|बात)\s+)?"
+                 r"(?:bhool|bhul|भूल)\s+(?:jao|jaao|jaana|जाओ|जाना)" + _HI_END)
+
+
+def _hi_target(m: re.Match[str] | None) -> str | None:
+    if not m:
+        return None
+    target = m.group("target").strip(" .,!?\"'।")
+    if not target or len(target) > 60 or len(target.split()) > 4:
+        return None
+    return target
+
+
+def parse_hindi(text: str) -> Intent | None:
+    """Hindi commands: "Chrome kholo", "गाना रोको", "आवाज़ बढ़ाओ", "याद रखना कि ..."."""
+    t = _fold(text)
+    for pattern in _HI_REMEMBER:
+        m = pattern.match(t)
+        if m:
+            return Intent("remember", m.group("fact").strip(" ,"), "hi")
+    m = _HI_FORGET.match(t)
+    if m:
+        return Intent("forget", m.group("fact").strip(" ,"), "hi")
+    for pattern, action in _HI_MEDIA:
+        if pattern.match(t):
+            return Intent("media", action, "hi")
+    for pattern, kind in ((_HI_UNINSTALL, "uninstall"), (_HI_INSTALL, "install"),
+                          (_HI_OPEN, "open_app"), (_HI_CLOSE, "close_app")):
+        target = _hi_target(pattern.match(t))
+        if target:
+            if kind == "open_app" and _DOMAIN.match(target):
+                return Intent("open_url", target.lower(), "hi")
+            return Intent(kind, target, "hi")  # type: ignore[arg-type]
     return None

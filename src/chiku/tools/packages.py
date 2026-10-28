@@ -105,13 +105,19 @@ def run_winget(args: list[str], timeout: float, cancel: CancelToken) -> tuple[in
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     deadline = time.monotonic() + timeout
-    while proc.poll() is None:
-        if cancel.cancelled or time.monotonic() > deadline:
-            proc.kill()
-            proc.wait(5)
-            raise WingetError("Cancelled." if cancel.cancelled else "winget took too long.")
-        time.sleep(0.2)
-    raw = proc.stdout.read() if proc.stdout else b""
+    while True:
+        # Keep reading while waiting: a large listing (e.g. `winget list`) fills the pipe and
+        # winget would block on it forever. Retrying communicate() loses no output.
+        try:
+            raw, _ = proc.communicate(timeout=0.2)
+            break
+        except subprocess.TimeoutExpired:
+            if cancel.cancelled or time.monotonic() > deadline:
+                proc.kill()
+                proc.communicate()
+                raise WingetError("Cancelled." if cancel.cancelled
+                                  else "winget took too long.") from None
+    raw = raw or b""
     text = raw.decode("utf-8", errors="replace")
     return proc.returncode & 0xFFFFFFFF, text
 
@@ -159,6 +165,15 @@ class Winget:
         args = ["list", "--id", self._check_id(query), "-e"] if exact_id \
             else ["list", "--query", query[:100]]
         code, out = self._run([*args, *COMMON], 90, cancel)
+        if code not in (0, NOT_FOUND):
+            raise WingetError("winget list failed.")
+        return [Package(r.get("Name", ""), r["Id"], r.get("Version", ""),
+                        r.get("Available", ""), r.get("Source", ""))
+                for r in parse_table(out)]
+
+    def installed_all(self, cancel: CancelToken) -> list[Package]:
+        """Every app winget can see on this PC (the Apps page). Read-only."""
+        code, out = self._run(["list", *COMMON], 120, cancel)
         if code not in (0, NOT_FOUND):
             raise WingetError("winget list failed.")
         return [Package(r.get("Name", ""), r["Id"], r.get("Version", ""),

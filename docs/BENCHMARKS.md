@@ -1,5 +1,31 @@
 # Benchmarks
 
+## v0.5.3 (2026-10-28)
+
+`python -m chiku --benchmark 3` on the same laptop (RTX 5050 Laptop GPU, Whisper `small.en` on
+CUDA, `qwen3:4b-instruct-2507-q4_K_M`). **Conditions:** 2.3 GB RAM free, 6.1 GB in the page
+file, CPU 18% busy before the run, on mains power. Full report:
+`%LOCALAPPDATA%\Chiku\logs\benchmark-20261028-181224.md`.
+
+| Metric | v0.5.3 | Notes |
+|---|---|---|
+| STT latency, small.en on CUDA (3–4 s utterances) | 0.16–0.18 s | WER 0 / 0 / 0.09 (the "14th" again) |
+| Kokoro real-time factor | 0.42–0.66 | Less memory pressure than the v0.5.0 runs |
+| LLM first token, warm cache | 0.03–0.05 s | |
+| Median end of speech → first audio | 4.67 s (3.04 / 4.67 / 7.64) | Varies with reply length and paging |
+| Cancellation | 5–13 ms | |
+| Process peak RSS | 1372 MB | |
+
+New in v0.5.3, measured separately:
+
+| Metric | Result | Method |
+|---|---|---|
+| Multilingual Whisper `small`, Hindi/English/Spanish/French detection and transcription | 0.19–0.45 s; Hindi detected with p 0.89–0.99 | Kokoro voices speaking each language |
+| Wake word recognition (`tiny.en` + "Hey Chiku. Wake up." prompt) | 17/18 phrases; 0/16 ordinary sentences and 0/10 noise clips falsely woke | Five Kokoro English voices plus Hindi voices; synthetic speech, not real rooms |
+| Wake word check time | ~0.38 s per speech segment (2 CPU threads) | Only segments found by VAD are checked |
+| CPU while waiting for the wake word | ~5% of one core in silence; ~35% of one core with non-stop speech nearby | `time.process_time` over 22 s of silence and 30 s of continuous speech |
+| `winget list` (220 apps) for the Apps page | 1.2 s (previously timed out after 120 s) | Pipe fix, see the changelog |
+
 ## Phase 5 (v0.5.0, 2026-10-28): reproducible benchmark and optimisations
 
 Run `python -m chiku --benchmark [RUNS]`. It is silent and local only. It writes

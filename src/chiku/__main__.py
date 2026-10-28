@@ -38,6 +38,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="measure latency, accuracy and resource use (silent; local only)")
     ap.add_argument("--version-info", action="store_true",
                     help="print the version and check that all native components load")
+    ap.add_argument("--background", action="store_true",
+                    help="start in the tray without a window (used at sign-in)")
     args = ap.parse_args(argv)
     if args.version_info:
         return diagnostics.version_info()
@@ -85,7 +87,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from chiku.ui.app import run_gui
 
-    return run_gui(settings, paths)
+    return run_gui(settings, paths, background=args.background)
 
 
 if __name__ == "__main__":

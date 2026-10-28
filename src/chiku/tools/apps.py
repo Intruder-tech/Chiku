@@ -186,6 +186,11 @@ class AppCatalog:
                     log.warning("app discovery failed: %s", exc)
             return list(self._entries)
 
+    def cached(self) -> list[AppEntry]:
+        """Entries already loaded, without scanning (UI thread: command palette)."""
+        with self._lock:
+            return list(self._entries)
+
     def invalidate(self) -> None:
         """Forget the cached list (e.g. after an app was installed or uninstalled)."""
         with self._lock:
