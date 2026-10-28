@@ -89,6 +89,11 @@ below.
   model → Manage models** lists installed models with size, quantization, tool support and VRAM
   use. You can download (with progress and a disk-space check), delete or switch models there,
   and pick the Whisper size.
+- **Install and update apps (winget).** "Install VLC", "uninstall Zoom", "check for
+  updates". You confirm every change in a dialog showing the exact package. Only official
+  winget and Microsoft Store sources are used.
+- **Chat-app layout and compact mode.** Sidebar pages, chat bubbles with timestamps, and a
+  floating always-on-top Chiku (Ctrl+Shift+Space). Warm light and dark themes follow Windows.
 - **Tool switches.** Settings → Tools turns any single ability off; that tool is hidden from the
   AI and refused.
 

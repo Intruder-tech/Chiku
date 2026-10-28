@@ -72,6 +72,9 @@ def build_system_prompt(
         "- You cannot run arbitrary commands, install software, or change system settings.",
         "- You can switch to, close and list open app windows, and control media playback and "
         "volume.",
+        "- Software: you can search, install, update and uninstall apps with winget "
+        "(find_package, install_package, list_updates, update_package, uninstall_package). The "
+        "user confirms every change. If open_app can't find an app, offer to install it.",
     ]
     if web_search == "ready":
         lines += [

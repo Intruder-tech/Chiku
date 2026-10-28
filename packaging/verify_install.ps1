@@ -10,6 +10,13 @@ $appId = "{7C5B2E6A-3F1D-4C8E-9B7A-2D4E6F8A1C3B}_is1"
 $uninstKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$appId"
 $dir = Join-Path $env:TEMP ("chiku-install-test-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
 $startLnk = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Chiku.lnk"
+if (Test-Path $uninstKey) {
+  # The test uses the real AppId: installing/uninstalling here would take over (and then remove)
+  # an existing installation's uninstall entry and shortcuts. Use a clean VM or test user instead.
+  $loc = (Get-ItemProperty $uninstKey).InstallLocation
+  Write-Error "Chiku is already installed for this user ($loc). Refusing to run: the test would modify that installation. Run this on a clean machine, VM or Windows Sandbox."
+  exit 2
+}
 $dataFiles = @("$env:APPDATA\Chiku\settings.json", "$env:LOCALAPPDATA\Chiku\memory.db") | Where-Object { Test-Path $_ }
 $results = [ordered]@{}
 

@@ -186,6 +186,12 @@ class AppCatalog:
                     log.warning("app discovery failed: %s", exc)
             return list(self._entries)
 
+    def invalidate(self) -> None:
+        """Forget the cached list (e.g. after an app was installed or uninstalled)."""
+        with self._lock:
+            self._loaded_at = 0.0
+            self._entries = []
+
     def search(self, query: str, limit: int = 5) -> list[tuple[AppEntry, float]]:
         q = normalise(query)
         q = normalise(ALIASES.get(q, q))

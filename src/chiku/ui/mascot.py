@@ -20,7 +20,6 @@ from PySide6.QtWidgets import QWidget
 
 from chiku.assistant import State
 from chiku.branding import AVATAR, BRAND_YELLOW, asset
-from chiku.ui import theme
 
 
 class MascotWidget(QWidget):
@@ -46,7 +45,7 @@ class MascotWidget(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        p.fillRect(self.rect(), QColor(theme.BG))
+        # transparent: the parent (page, card) background shows through
         t = time.monotonic() - self._t0
         s, lvl = self._state, self._smooth
         scale, angle, dy, opacity, ring = 1.0, 0.0, 0.0, 1.0, 0.0

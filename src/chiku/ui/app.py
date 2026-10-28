@@ -33,7 +33,8 @@ def run_gui(settings: Settings, paths: AppPaths) -> int:
     app = existing if isinstance(existing, QApplication) else QApplication(sys.argv)
     app.setApplicationName("Chiku")
     app.setWindowIcon(QIcon(str(asset(ICON))))
-    app.setStyleSheet(theme.QSS)
+    app.setStyleSheet(theme.apply(settings.ui.theme))
+    app.setQuitOnLastWindowClosed(False)  # compact mode hides the main window
 
     # One instance only: two copies would fight over the microphone.
     lock = QLockFile(str(paths.data_dir / "chiku.lock"))

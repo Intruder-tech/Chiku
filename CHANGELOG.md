@@ -2,6 +2,29 @@
 
 All notable changes to this project are listed here. Versions follow [SemVer](https://semver.org).
 
+## [0.5.2] - 2026-10-28
+
+### Added
+- **App management with winget.** Say "install VLC", "uninstall Zoom", "update VS Code" or
+  "check for updates". Chiku can also look apps up (`find_package`). Every install, uninstall
+  or update shows a confirmation with the exact package (name, id, version, publisher,
+  source). Only the official `winget` and `msstore` sources are used; nothing is downloaded
+  from arbitrary websites. Per-user installs are tried first, and machine-wide installers get
+  Windows' own UAC prompt. Results are verified with `winget list`, and the app list refreshes
+  so "open VLC" works right after installing.
+- **New UI.**
+  - Chat-app layout: a sidebar (Chat, Memory, Activity, Settings as pages instead of
+    pop-ups) and chat bubbles with timestamps and provenance.
+  - Animated mascot header with a live level meter (mint for your voice, yellow for hers).
+  - Compact mode: a small, always-on-top, draggable Chiku. Toggle with Ctrl+Shift+Space, or
+    choose "Start in compact mode".
+  - Tray icon.
+  - Warm light and dark themes based on the mascot; the default follows Windows.
+
+### Changed
+- UI code split into a view-model (`ui/viewmodel.py`) and components (`ui/components/`), with
+  offscreen UI tests.
+
 ## [0.5.1] - 2026-10-28
 
 ### Fixed

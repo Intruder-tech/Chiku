@@ -47,9 +47,9 @@ class Waveform(QWidget):
         if self._mode == "idle":
             color = QColor(theme.FAINT)
         elif self._mode == "input":
-            color = QColor(theme.MUTED).lighter(130)
+            color = QColor(theme.MINT)  # your voice: mint
         else:
-            color = QColor(theme.WHITE)
+            color = QColor(theme.ACCENT)  # Chiku's voice: mascot yellow
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(color)
         for i, v in enumerate(self._levels):

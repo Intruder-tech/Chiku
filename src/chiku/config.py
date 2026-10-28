@@ -115,6 +115,11 @@ class MemorySettings(BaseModel):
     max_in_prompt: int = Field(40, ge=0, le=200)
 
 
+class UISettings(BaseModel):
+    theme: Literal["system", "light", "dark"] = "system"
+    start_compact: bool = False  # open as the small floating mascot window
+
+
 class ToolSettings(BaseModel):
     disabled: list[str] = Field(default_factory=list)  # tool names switched off by the user
 
@@ -149,6 +154,7 @@ class Settings(BaseModel):
     files: FileSettings = Field(default_factory=FileSettings)
     memory: MemorySettings = Field(default_factory=MemorySettings)
     tools: ToolSettings = Field(default_factory=ToolSettings)
+    ui: UISettings = Field(default_factory=UISettings)
 
 
 def is_loopback_url(url: str) -> bool:

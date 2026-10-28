@@ -252,6 +252,14 @@ class SettingsDialog(QDialog):
         self.extra.setPlaceholderText("Anything else Chiku should keep in mind")
         self.extra.setMaximumHeight(90)
         f.addRow("Preferences", self.extra)
+        self.theme = QComboBox()
+        for key, text in (("system", "Follow Windows"), ("light", "Light"), ("dark", "Dark")):
+            self.theme.addItem(text, key)
+        self.theme.setCurrentIndex(max(0, self.theme.findData(self.s.ui.theme)))
+        f.addRow("Theme", self.theme)
+        self.start_compact = QCheckBox("Start in compact mode (small floating Chiku)")
+        self.start_compact.setChecked(self.s.ui.start_compact)
+        f.addRow(self.start_compact)
         return w
 
     def _web_tab(self) -> QWidget:
@@ -477,6 +485,8 @@ class SettingsDialog(QDialog):
                 k, _, val = line.partition("=")
                 if k.strip() and val.strip():
                     pron[k.strip()] = val.strip()
+        data["ui"].update(theme=self.theme.currentData(),
+                          start_compact=self.start_compact.isChecked())
         data["persona"].update(
             user_name=self.user_name.text().strip() or None,
             tone=self.tone.text().strip() or self.s.persona.tone,

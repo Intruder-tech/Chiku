@@ -676,6 +676,17 @@ class Assistant:
             if not self._tool_on("forget_memory"):
                 return None
             return "forget_memory", {"query": intent.target[:200]}, ""
+        if intent.kind == "install":
+            return ("install_package", {"query": intent.target},
+                    f"Let me find {intent.target} for you.")
+        if intent.kind == "uninstall":
+            return ("uninstall_package", {"query": intent.target},
+                    f"Okay, looking for {intent.target}.")
+        if intent.kind == "update":
+            return ("update_package", {"query": intent.target},
+                    f"Checking for an update to {intent.target}.")
+        if intent.kind == "check_updates":
+            return "list_updates", {}, "Let me check for updates."
         if intent.kind == "media":
             return ("media_control", {"action": intent.target}, "") \
                 if self._registry.get("media_control") else None

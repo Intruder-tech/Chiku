@@ -21,6 +21,7 @@ from chiku.stt.whisper import WhisperSTT
 from chiku.tools.apps import AppCatalog, FindAppTool, OpenAppTool
 from chiku.tools.files import FileScope, file_tools
 from chiku.tools.memory_tools import memory_tools
+from chiku.tools.packages import Winget, package_tools
 from chiku.tools.registry import ToolExecutor, ToolRegistry
 from chiku.tools.research import ReadWebPageTool, SourceSession, WebSearchTool
 from chiku.tools.system_info import SystemInfoTool
@@ -67,6 +68,7 @@ def build_registry(
     windows: WindowBackend | None = None,
     memory: MemoryStore | None = None,
     user_text: Callable[[], str] = lambda: "",
+    winget: Winget | None = None,
 ) -> ToolRegistry:
     reg = ToolRegistry()
 
@@ -95,6 +97,8 @@ def build_registry(
     for tool in file_tools(scope, lambda: settings_getter().files):
         reg.register(tool)
     for tool in window_tools(windows or Win32Backend(), catalog, perms):
+        reg.register(tool)
+    for tool in package_tools(winget or Winget(), catalog.invalidate):
         reg.register(tool)
     if memory is not None:
         for tool in memory_tools(memory, lambda: settings_getter().memory, user_text):

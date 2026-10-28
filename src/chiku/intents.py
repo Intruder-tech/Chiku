@@ -55,7 +55,23 @@ _NOT_APP = re.compile(
 )
 
 IntentKind = Literal["open_app", "open_url", "switch_app", "close_app", "media", "remember",
-                     "forget"]
+                     "forget", "install", "uninstall", "update", "check_updates"]
+
+_INSTALL = re.compile(
+    _PREFIX + r"(?:install|set up|download and install)\s+(?:the\s+|an?\s+)?(?:app\s+)?"
+    r"(?P<target>.+?)(?:\s+(?:app|application|program))?(?:\s+for me)?(?:[,\s]+please)?"
+    r"\s*[.!?]*\s*$", re.I)
+_UNINSTALL = re.compile(
+    _PREFIX + r"(?:uninstall|remove the (?:app|application|program))\s+(?:the\s+)?"
+    r"(?P<target>.+?)(?:\s+(?:app|application|program))?(?:[,\s]+please)?\s*[.!?]*\s*$", re.I)
+_CHECK_UPDATES = re.compile(
+    _PREFIX + r"(?:check for (?:app |software )?updates|update (?:all )?(?:my |the )?"
+    r"(?:apps|applications|programs|software)|(?:are there (?:any )?|any )(?:app )?updates"
+    r"(?: available)?|install (?:the |all )?(?:latest |available )?updates)"
+    r"(?:[,\s]+please)?\s*[.!?]*\s*$", re.I)
+_UPDATE = re.compile(
+    _PREFIX + r"update\s+(?:the\s+|my\s+)?(?P<target>.+?)(?:\s+(?:app|application))?"
+    r"(?:[,\s]+please)?\s*[.!?]*\s*$", re.I)
 
 _FILLER = r"(?:(?:also|and|oh|btw|by the way|one more thing|actually)[,\s]+)*"
 _REMEMBER = re.compile(
@@ -166,6 +182,12 @@ def parse_command(text: str) -> Intent | None:
     m = _FORGET.match(text)
     if m and not _NOT_A_FACT.match(m.group("fact")):
         return Intent("forget", m.group("fact").strip())
+    if _CHECK_UPDATES.match(text):
+        return Intent("check_updates", "")
+    for pattern, kind in ((_UNINSTALL, "uninstall"), (_INSTALL, "install"), (_UPDATE, "update")):
+        t = _app_target(pattern.match(text))
+        if t:
+            return Intent(kind, t)  # type: ignore[arg-type]
     for pattern, action in _MEDIA:
         if pattern.match(text):
             return Intent("media", action)
