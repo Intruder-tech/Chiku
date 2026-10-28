@@ -89,6 +89,15 @@ below.
   model → Manage models** lists installed models with size, quantization, tool support and VRAM
   use. You can download (with progress and a disk-space check), delete or switch models there,
   and pick the Whisper size.
+- **Messages on Discord and WhatsApp.** "Text Manas on Discord saying I'll be late",
+  "tell Priya on WhatsApp I will call her later". Chiku opens the chat (the Discord desktop
+  app, or WhatsApp Web in your browser, opening it if needed), types the message and shows
+  you who it is going to and what it says. It is sent only when you click Yes. She checks
+  where the keyboard focus is before every keystroke step, so if a game or pop-up has the
+  focus she stops without typing anything.
+- **Use other apps.** Chiku can read the buttons, tabs and fields of an open app, press one
+  by name, type text or press a key combo in it. Each of those asks you first. Terminals,
+  PowerShell, Registry Editor, admin tools, password managers and UAC prompts are off limits.
 - **Install and update apps (winget).** "Install VLC", "uninstall Zoom", "check for
   updates". You confirm every change in a dialog showing the exact package. Only official
   winget and Microsoft Store sources are used.
@@ -214,6 +223,7 @@ Turn on the **Mic** button (Ctrl+M) and talk. Esc or **Stop** interrupts. You ca
 | `python -m chiku --read-page URL` | Fetch a page and show the extracted text |
 | `python -m chiku --find-files NAME` | Search your user folders by file name |
 | `python -m chiku --windows` | List open app windows |
+| `python -m chiku --read-app Discord` | List the buttons, tabs and fields Chiku sees in an open app (read-only) |
 | `python -m chiku --memory` | List what Chiku remembers |
 | `python -m chiku --models` | List installed Ollama models (size, capabilities, VRAM) |
 
@@ -301,6 +311,11 @@ Manual, hardware-dependent checks are listed in [docs/TESTING.md](docs/TESTING.m
   clients). Chiku respects that and answers from the search snippet instead of disguising
   itself.
 - Media keys go to whichever app Windows routes them to; Chiku can't confirm a player reacted.
+- Messaging drives the apps' own UI, so it depends on Discord's quick switcher (Ctrl+K) and
+  WhatsApp Web's chat search (Ctrl+Alt+/) and on their control names; an app update can break
+  it until Chiku is updated. WhatsApp Web picks the top search result, so check the name in
+  the confirmation dialog. The Discord flow was tested on the real app; the WhatsApp flow has
+  only automated tests so far. Only Discord and WhatsApp are supported for sending.
 - Memory is a simple list placed in the prompt (up to 40 items; older ones are reachable via
   `search_memory`). There is no semantic or embedding search yet.
 - "Remember …" with unusual phrasing may go to the model. A 4B model sometimes *says* it will

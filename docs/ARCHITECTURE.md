@@ -208,6 +208,35 @@ name, then title words.
 The fast path covers "switch to X" and "close X" only when a matching window exists, and
 handles media phrases. "stop" is deliberately excluded, because that word interrupts Chiku.
 
+### App control and messaging
+
+`automation/keyboard.py` sends keys with `SendInput`; text goes as `KEYEVENTF_UNICODE`
+characters, so any script types without the clipboard. `automation/uia.py` wraps Windows UI
+Automation through comtypes: list a window's named controls, press one by name (Invoke,
+Toggle, Select or Expand pattern) and report the focused control. Both sit behind protocols
+so tests run without a desktop.
+
+`tools/app_control.py` builds five tools on a shared `Desktop` (window backend, keyboard,
+UI Automation, app catalog): `read_app` (automatic), `press_keys`, `type_text`,
+`click_in_app` (each confirmed) and `send_message`. Windows of shells, terminals and admin
+tools are refused by `permission_for`.
+
+`send_message` is automatic to start because it only opens a chat; sending is a confirmation
+asked in the middle of the run through `ToolContext.confirm`, and the audit entry records the
+answer. Its steps:
+
+1. **Discord:** find or launch the desktop app, focus it, Ctrl+K, check the quick switcher has
+   the focus, type `@name` (people only, so a direct message beats a group containing the
+   name), Enter, and wait up to 6 s for the window title to name the person; otherwise try the
+   plain name (groups and channels).
+2. **WhatsApp:** find a browser window titled WhatsApp, else select a WhatsApp tab through UI
+   Automation, else open web.whatsapp.com; Ctrl+Alt+/, check the search has the focus, type
+   the name, Enter.
+3. Check the message box has the focus, type the text, ask, check the focus again, Enter.
+
+Every "check the focus" stops the run with `focus_check_failed`, typing nothing, when the
+focused control isn't the expected one.
+
 ### Memory (Phase 4)
 
 `memory.py` holds `MemoryStore`, a SQLite file at `%LOCALAPPDATA%\Chiku\memory.db` with one

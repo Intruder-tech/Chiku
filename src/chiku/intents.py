@@ -56,7 +56,21 @@ _NOT_APP = re.compile(
 )
 
 IntentKind = Literal["open_app", "open_url", "switch_app", "close_app", "media", "remember",
-                     "forget", "install", "uninstall", "update", "check_updates"]
+                     "forget", "install", "uninstall", "update", "check_updates", "message"]
+
+# "text Aman on WhatsApp saying I'm running late", "send a Discord message to Manas: hi",
+# "on WhatsApp, tell Mom that I reached". Group names: app, to, text.
+_APP = r"(?P<app>discord|whats\s?app)"
+_SAYING = r"(?:\s*[,:\-]\s*|\s+(?:saying|that says|to say|that)\s+|\s+)"
+_MESSAGE = [re.compile(p, re.I | re.S) for p in (
+    _PREFIX + r"(?:please\s+)?(?:text|message|dm|ping|tell|send(?:\s+a)?\s+(?:message|text|msg|dm)"
+    r"\s+to)\s+(?P<to>.+?)\s+(?:on|via|in|over|using|through)\s+" + _APP + _SAYING
+    + r"(?P<text>.+?)\s*$",
+    _PREFIX + r"(?:please\s+)?send\s+(?:a\s+)?" + _APP
+    + r"(?:\s+(?:message|msg|text|dm))?\s+to\s+(?P<to>.+?)" + _SAYING + r"(?P<text>.+?)\s*$",
+    _PREFIX + r"(?:on|in|over)\s+" + _APP + r"[,\s]+(?:please\s+)?(?:text|message|dm|tell)\s+"
+    r"(?P<to>.+?)" + _SAYING + r"(?P<text>.+?)\s*$",
+)]
 
 _INSTALL = re.compile(
     _PREFIX + r"(?:install|set up|download and install)\s+(?:the\s+|an?\s+)?(?:app\s+)?"
@@ -128,6 +142,7 @@ class Intent:
     kind: IntentKind
     target: str
     lang: str = "en"  # language the command was given in; acknowledgements use it
+    extra: tuple[str, ...] = ()  # "message": (app, recipient, text)
 
 
 def _app_target(m: re.Match[str] | None) -> str | None:
@@ -180,7 +195,24 @@ def parse_command(text: str) -> Intent | None:
     return _parse_english(text) or parse_hindi(text)
 
 
+def parse_message(text: str) -> Intent | None:
+    for pattern in _MESSAGE:
+        m = pattern.match(text)
+        if m:
+            app = "whatsapp" if "whats" in m.group("app").lower() else "discord"
+            to = m.group("to").strip(" ,.:\"'")
+            # "my sister Asha" / "my best friend Rahul" -> the name the app knows them by
+            to = re.sub(r"^my\s+(?:\w+\s+){0,2}(?=\S+$)", "", to, flags=re.I) or to
+            body = m.group("text").strip().strip("\"“”")
+            if to and body and len(to) <= 80:
+                return Intent("message", to, "en", (app, to, body))
+    return None
+
+
 def _parse_english(text: str) -> Intent | None:
+    msg = parse_message(text)
+    if msg is not None:
+        return msg
     m = _REMEMBER.match(text)
     if m and not _NOT_A_FACT.match(m.group("fact")):
         # "I'm vegetarian and I live in Pune" -> two separate memories, so each can be

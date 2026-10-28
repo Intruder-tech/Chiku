@@ -51,6 +51,10 @@ claim to be local when it wasn't.
 | Any tool switched off in Settings → Tools | Refused, and hidden from the model |
 | Download or delete a model | Your click in the Models window; a download is refused if it would leave less than 2 GB free |
 | Close an app | Confirmation dialog (configurable); uses `WM_CLOSE` so apps can ask to save |
+| Read the buttons, tabs and fields of an open app (`read_app`) | Automatic; password field values are never read |
+| Press keys, type text or press a button in another app | Confirmation dialog for each action |
+| Any of those in a terminal, PowerShell, Registry Editor, `.msc`/MMC, Services, a password manager or a UAC prompt | Refused |
+| Send a Discord or WhatsApp Web message | Chiku opens the chat and types the draft; it is sent only after you click Yes in a dialog showing the recipient and text |
 | Delete files, change settings, install software, run elevated commands, payments | Not implemented. No tool exists, so the model cannot do these. |
 
 Confirmation dialogs default to "No" and time out to "deny" after 120 s. The app runs as a
@@ -101,6 +105,23 @@ normal user and never requests elevation.
   and file changes and app closes always need confirmation. The residual risk is that injected
   text could steer a *search query* or the wording of an answer. Sources are shown so you can
   check them.
+- **Driving other apps.** App control works through the keyboard (`SendInput`) and Windows UI
+  Automation, the accessibility API screen readers use. There is no mouse-coordinate clicking
+  and no clipboard use. Key combos are parsed against a strict pattern (Ctrl/Shift/Alt plus
+  one key; the Windows key is not allowed). Windows of shells, terminals and admin tools are
+  refused outright, so a compromised model can't type commands. Text read from another app is
+  returned to the model as untrusted data.
+- **Keystrokes landing in the wrong place.** Typed keys go wherever Windows has the keyboard
+  focus, which may not be where Chiku expects (a game, a pop-up, another field). Found in
+  testing: a Discord Activity kept the focus, so Discord's quick switcher never opened. The
+  messaging tool therefore asks UI Automation which control has the focus before every typing
+  step and again before pressing Enter. It types only into Discord's quick switcher /
+  WhatsApp's chat search and then the message box. If the focus is anywhere else it presses
+  Escape and stops without typing anything. If you decline, the draft is cleared only when the
+  message box still has the focus.
+- **Sending messages.** There is no Discord bot or user token (automating a user account
+  through the API breaks Discord's terms) and no WhatsApp API. Chiku uses the apps you are
+  already signed in to, like you would. Nothing is sent without your Yes in the dialog.
 - **SSRF.** The page fetcher resolves the host on every redirect hop and refuses any
   non-global address (loopback, RFC 1918, link-local such as cloud metadata, multicast). The
   known gap is DNS rebinding between the check and the connection. That's acceptable for a
@@ -140,6 +161,7 @@ normal user and never requests elevation.
 | pydantic | 2.14.1 | MIT | |
 | keyring | 25.7.0 | MIT | |
 | psutil | 7.2.2 | BSD-3 | |
+| comtypes | 1.4.17 | MIT | Windows UI Automation for app control. |
 | numpy | 2.5.4 | BSD-3 | |
 | nvidia-cublas-cu12 / nvidia-cudnn-cu12 (optional) | 12.9 / 9.27 | NVIDIA proprietary | Optional `[cuda]` extra. |
 | Ollama | 0.40.11 | MIT | Separate install. |

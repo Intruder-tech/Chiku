@@ -2,6 +2,29 @@
 
 All notable changes to this project are listed here. Versions follow [SemVer](https://semver.org).
 
+## [0.5.5] - 2026-10-29
+
+### Added
+
+- **Send messages on Discord and WhatsApp Web.** "Text Manas on Discord saying I'll be
+  late" opens the chat, types the message and asks you to confirm before sending. Works in
+  English and Hindi requests; no model call is needed for the common phrasings.
+- **App control.** New tools read the buttons, tabs and fields of an open app, press one by
+  name, type text and press key combos, through Windows UI Automation and the keyboard. Each
+  action that changes something asks first. Terminals, PowerShell and admin tools are refused.
+- Tools can now ask for a confirmation in the middle of a run; the answer is in the audit log.
+
+### Security
+
+- Before typing anything the messaging tool checks which control has the keyboard focus, and
+  checks again before pressing Enter. If a game, pop-up or other field has the focus, it stops
+  without typing. (An early test build typed a chat name while a Discord Activity held the
+  focus; that build was never released.)
+
+### Dependencies
+
+- comtypes 1.4.17 (MIT), for Windows UI Automation.
+
 ## [0.5.4] - 2026-10-28
 
 ### Changed

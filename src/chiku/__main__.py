@@ -32,6 +32,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--read-page", metavar="URL", help="fetch a page and show extracted text")
     ap.add_argument("--find-files", metavar="QUERY", help="search your user folders by name")
     ap.add_argument("--windows", action="store_true", help="list open app windows")
+    ap.add_argument("--read-app", metavar="NAME",
+                    help="list the buttons and fields Chiku sees in an open app")
     ap.add_argument("--memory", action="store_true", help="list what Chiku remembers")
     ap.add_argument("--models", action="store_true", help="list installed Ollama models")
     ap.add_argument("--benchmark", nargs="?", type=int, const=3, metavar="RUNS",
@@ -49,8 +51,8 @@ def main(argv: list[str] | None = None) -> int:
     settings = load_settings(paths.settings_file)
     cli = any([args.check, args.download_models, args.say, args.mic_test, args.chat,
                args.list_apps is not None, args.open_app, args.set_search_key, args.search,
-               args.read_page, args.find_files, args.windows, args.memory, args.models,
-               args.benchmark])
+               args.read_page, args.find_files, args.windows, args.read_app, args.memory,
+               args.models, args.benchmark])
     setup_logging(paths.logs_dir, console=cli and diagnostics.stdout_available())
 
     if args.download_models:
@@ -78,6 +80,8 @@ def main(argv: list[str] | None = None) -> int:
         return diagnostics.run_tool(settings, paths, "find_files", {"query": args.find_files})
     if args.windows:
         return diagnostics.run_tool(settings, paths, "list_open_windows", {})
+    if args.read_app:
+        return diagnostics.run_tool(settings, paths, "read_app", {"app_name": args.read_app})
     if args.memory:
         return diagnostics.show_memory(paths)
     if args.models:

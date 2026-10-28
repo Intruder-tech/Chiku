@@ -181,6 +181,7 @@ _PHRASES: dict[str, dict[str, tuple[str, ...]]] = {
         "remembered": ("Got it, I'll remember that.", "Okay, noted.",
                        "Sure, I'll keep that in mind."),
         "forgot": ("Okay, I've forgotten that.",),
+        "message": ("Okay, opening {app} to message {name}.",),
     },
     "hi": {
         "open": ("{name} खोल रही हूँ।", "अभी {name} खोलती हूँ।"),
@@ -196,6 +197,7 @@ _PHRASES: dict[str, dict[str, tuple[str, ...]]] = {
         "failed": ("माफ़ कीजिए, ये नहीं हो पाया। {message}",),
         "remembered": ("ठीक है, मैं याद रखूँगी।", "ठीक है, नोट कर लिया।"),
         "forgot": ("ठीक है, मैंने भुला दिया।",),
+        "message": ("{app} पर {name} को मैसेज लिख रही हूँ।",),
     },
 }
 _LOOKUPS = ("Let me look that up.", "One sec, I'll check online.", "Let me check the web.")
@@ -946,6 +948,13 @@ class Assistant:
         if intent.kind in packages:
             return (packages[intent.kind], {"query": target},
                     say[intent.kind][0].format(name=target), lang)
+        if intent.kind == "message":
+            if not self._tool_on("send_message") or len(intent.extra) != 3:
+                return None
+            app, to, body = intent.extra
+            label = "WhatsApp" if app == "whatsapp" else "Discord"
+            return ("send_message", {"app": app, "to": to, "text": body[:2000]},
+                    say["message"][0].format(app=label, name=to), lang)
         if intent.kind == "check_updates":
             return "list_updates", {}, say["updates"][0], lang
         if intent.kind == "media":

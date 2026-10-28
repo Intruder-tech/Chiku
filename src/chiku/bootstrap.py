@@ -10,6 +10,8 @@ from chiku.audio.capture import MicCapture
 from chiku.audio.playback import AudioPlayer
 from chiku.audio.vad import EnergyVAD, SileroVAD, SpeechDetector
 from chiku.audit import AuditLog
+from chiku.automation.keyboard import Win32Keyboard
+from chiku.automation.uia import UIAutomation
 from chiku.config import LLMSettings, PermissionSettings, Settings, STTSettings
 from chiku.llm.base import LLMError, LLMProvider, ProviderStatus
 from chiku.llm.ollama import OllamaProvider
@@ -18,7 +20,9 @@ from chiku.memory import MemoryStore
 from chiku.models import SILERO_VAD
 from chiku.paths import AppPaths
 from chiku.stt.whisper import WhisperSTT
+from chiku.tools.app_control import Desktop, app_control_tools
 from chiku.tools.apps import AppCatalog, FindAppTool, OpenAppTool
+from chiku.tools.apps import launch as launch_app
 from chiku.tools.files import FileScope, file_tools
 from chiku.tools.memory_tools import memory_tools
 from chiku.tools.packages import Winget, package_tools
@@ -71,6 +75,7 @@ def build_registry(
     memory: MemoryStore | None = None,
     user_text: Callable[[], str] = lambda: "",
     winget: Winget | None = None,
+    desktop: Desktop | None = None,
 ) -> ToolRegistry:
     reg = ToolRegistry()
 
@@ -98,7 +103,12 @@ def build_registry(
 
     for tool in file_tools(scope, lambda: settings_getter().files):
         reg.register(tool)
-    for tool in window_tools(windows or Win32Backend(), catalog, perms):
+    backend = windows or Win32Backend()
+    for tool in window_tools(backend, catalog, perms):
+        reg.register(tool)
+    if desktop is None:
+        desktop = Desktop(backend, Win32Keyboard(), UIAutomation(), catalog, launch=launch_app)
+    for tool in app_control_tools(desktop):
         reg.register(tool)
     for tool in package_tools(winget or Winget(), catalog.invalidate):
         reg.register(tool)

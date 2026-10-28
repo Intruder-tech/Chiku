@@ -114,7 +114,19 @@ class ToolExecutor:
             return self._finish(name, args_for_log, result, approval, t0)
 
         tool_cancel = CancelToken()
-        future = self._pool.submit(tool.run, args, ToolContext(cancel=tool_cancel))
+        asked: list[bool] = []  # answers to questions the tool asked while running
+
+        def confirm_mid_run(description: str) -> bool:
+            try:
+                ok = bool(self.confirm(name, description))
+            except Exception:
+                log.exception("confirmation prompt failed")
+                ok = False
+            asked.append(ok)
+            return ok
+
+        future = self._pool.submit(tool.run, args,
+                                   ToolContext(cancel=tool_cancel, confirm=confirm_mid_run))
         deadline = time.monotonic() + tool.timeout_s
         while True:
             try:
@@ -137,6 +149,8 @@ class ToolExecutor:
                 break
         if not isinstance(result, ToolResult):
             result = ToolResult.failure("tool_error", f"{name} returned an invalid result.")
+        if asked:  # the audit log records what the user answered mid-run
+            approval = "user" if all(asked) else "denied"
         return self._finish(name, args_for_log, result, approval, t0)
 
     def _finish(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, ClassVar
@@ -44,9 +45,15 @@ class ToolResult:
         return json.dumps(payload, ensure_ascii=False, default=str)
 
 
+def _deny(_description: str) -> bool:
+    return False
+
+
 @dataclass
 class ToolContext:
     cancel: CancelToken
+    # Ask the user mid-run (e.g. "send this message?" once the chat is open). Default: deny.
+    confirm: Callable[[str], bool] = _deny
 
 
 class Tool(ABC):
