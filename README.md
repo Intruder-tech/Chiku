@@ -96,9 +96,14 @@ below.
   - **Left:** pages (Chat, Profile, Apps, Memory, Activity, Settings) and your chats. "+ New"
     or Ctrl+N starts a chat; right-click deletes one.
   - **Centre:** the chat or the current page.
-  - **Right:** the live mascot and voice level, component status, the sources of the last
-    answer and Chiku's recent actions. Ctrl+. shows or hides it; it hides itself in narrow
-    windows.
+  - **Right (optional):** the live mascot and voice level, component status, the sources of
+    the last answer and Chiku's recent actions. Off by default; Ctrl+. or the button above
+    the chat shows it.
+
+  A new chat greets you by name in the middle of the window. After the first message the
+  conversation fills the window and the message box sits at the bottom. Switch light and dark
+  from the sidebar or Settings → Appearance. Closing the window keeps Chiku in the tray
+  (`ui.close_to_tray`); quit from the tray menu.
 
   **Ctrl+K** opens a command palette for pages, actions, any Settings tab, past chats and
   "Open <app>" (apps open through the same permission-checked, logged path as voice).

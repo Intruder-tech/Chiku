@@ -30,12 +30,11 @@ _HANDSHAKE, _FRAME, _CLOSE = 0, 1, 2
 def activity(started: int) -> dict[str, Any]:
     """The whole presence. Fixed text only: nothing about what the user is doing."""
     return {
-        "details": "Chatting with Chiku",
-        "state": "Local AI voice assistant",
+        "details": "Chatting with Chiku · local AI voice assistant",
+        "state": f"Free & open source · {REPO_URL.removeprefix('https://')}",
         "timestamps": {"start": started},
-        "assets": {"large_image": "chiku", "large_text": "Chiku runs on your own PC"},
-        "buttons": [{"label": "Get Chiku", "url": REPO_URL},
-                    {"label": "Releases", "url": f"{REPO_URL}/releases"}],
+        "assets": {"large_image": "chiku", "large_text": "Install Chiku from GitHub"},
+        "buttons": [{"label": "Install Chiku from GitHub", "url": REPO_URL}],
     }
 
 

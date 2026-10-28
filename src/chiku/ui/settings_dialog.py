@@ -5,26 +5,29 @@ from __future__ import annotations
 import os
 import re
 import threading
+from collections.abc import Callable
 
 from pydantic import ValidationError
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
-    QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
     QSlider,
     QSpinBox,
-    QTabWidget,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -37,6 +40,9 @@ from chiku.conversations import ConversationStore
 from chiku.language import DEFAULT_VOICES
 from chiku.llm.openai_compat import OPENAI_KEY_NAME
 from chiku.paths import AppPaths
+from chiku.ui import theme as ui_theme
+from chiku.ui.components.page import PageHeader, Segmented, card, centred
+from chiku.ui.components.toggle import Toggle
 from chiku.wake import WAKE_MODEL
 from chiku.web.search import BRAVE_KEY_NAME
 
@@ -62,6 +68,32 @@ def multilingual_model(model: str) -> str:
     return model.removesuffix(".en")
 
 
+class _Sections:
+    """`tabs`-like access to the sections (count, titles, switching), for deep links."""
+
+    def __init__(self, nav: QListWidget):
+        self.nav = nav
+
+    def count(self) -> int:
+        return self.nav.count()
+
+    def tabText(self, i: int) -> str:  # noqa: N802 - mirrors QTabWidget
+        item = self.nav.item(i)
+        return item.text() if item is not None else ""
+
+    def setCurrentIndex(self, i: int) -> None:  # noqa: N802 - mirrors QTabWidget
+        self.nav.setCurrentRow(i)
+
+    def currentIndex(self) -> int:  # noqa: N802 - mirrors QTabWidget
+        return self.nav.currentRow()
+
+
+def _preview_theme(mode: str) -> None:
+    app = QApplication.instance()
+    if isinstance(app, QApplication):
+        app.setStyleSheet(ui_theme.apply(mode))
+
+
 def _note(text: str) -> QLabel:
     lab = QLabel(text)
     lab.setObjectName("notice")
@@ -71,34 +103,124 @@ def _note(text: str) -> QLabel:
 
 class SettingsDialog(QDialog):
     def __init__(self, assistant: Assistant, paths: AppPaths, parent: QWidget | None = None,
-                 conversations: ConversationStore | None = None):
+                 conversations: ConversationStore | None = None,
+                 on_theme: Callable[[str], None] | None = None):
         super().__init__(parent)
         self.assistant = assistant
         self.paths = paths
         self.conversations = conversations
+        self.on_theme = on_theme or _preview_theme
         self.s = assistant.settings
         self.setWindowTitle("Chiku settings")
-        self.resize(520, 560)
-        tabs = self.tabs = QTabWidget()
-        tabs.addTab(self._audio_tab(), "Audio")
-        tabs.addTab(self._voice_tab(), "Voice")
-        tabs.addTab(self._language_tab(), "Languages")
-        tabs.addTab(self._background_tab(), "Background")
-        tabs.addTab(self._ai_tab(), "AI model")
-        tabs.addTab(self._persona_tab(), "Persona")
-        tabs.addTab(self._web_tab(), "Web")
-        tabs.addTab(self._tools_tab(), "Tools")
-        tabs.addTab(self._privacy_tab(), "Privacy")
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self._save)
-        buttons.rejected.connect(self.reject)
-        lay = QVBoxLayout(self)
-        lay.addWidget(tabs)
-        lay.addWidget(buttons)
+        self.resize(940, 660)
+        sections = [
+            ("Appearance", "Theme, the window, and how Chiku looks when minimised.",
+             self._appearance_tab()),
+            ("Voice", "How Chiku sounds.", self._voice_tab()),
+            ("Audio", "Microphone, speaker and how Chiku listens.", self._audio_tab()),
+            ("Languages", "The languages Chiku understands and answers in.",
+             self._language_tab()),
+            ("Background", "The wake word and starting with Windows.", self._background_tab()),
+            ("AI model", "Where Chiku's replies are generated.", self._ai_tab()),
+            ("Persona", "Chiku's personality and how she talks to you.", self._persona_tab()),
+            ("Web", "Searching the web and reading pages.", self._web_tab()),
+            ("Tools", "Switch any single ability on or off.", self._tools_tab()),
+            ("Privacy", "What Chiku keeps, and what she may do on this computer.",
+             self._privacy_tab()),
+        ]
+        root = QHBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        side = QWidget()
+        side.setFixedWidth(220)
+        sl = QVBoxLayout(side)
+        sl.setContentsMargins(16, 22, 8, 16)
+        sl.setSpacing(10)
+        title = QLabel("Settings")
+        title.setObjectName("pageTitle")
+        sl.addWidget(title)
+        self.nav = QListWidget()
+        self.nav.setObjectName("settingsNav")
+        sl.addWidget(self.nav, 1)
+        root.addWidget(side)
+        right = QVBoxLayout()
+        right.setContentsMargins(0, 0, 0, 0)
+        right.setSpacing(0)
+        self.stack = QStackedWidget()
+        for name, subtitle, widget in sections:
+            self.nav.addItem(name)
+            self.stack.addWidget(self._section(name, subtitle, widget))
+        self.nav.currentRowChanged.connect(self.stack.setCurrentIndex)
+        self.nav.setCurrentRow(0)
+        right.addWidget(self.stack, 1)
+        footer = QFrame()
+        footer.setObjectName("footerBar")
+        fl = QHBoxLayout(footer)
+        fl.setContentsMargins(24, 10, 24, 10)
+        fl.addWidget(_note("Changes apply when you save. The theme switches at once."), 1)
+        cancel = QPushButton("Cancel")
+        cancel.setObjectName("ghost")
+        cancel.clicked.connect(self.reject)
+        save = QPushButton("Save changes")
+        save.setObjectName("primary")
+        save.clicked.connect(self._save)
+        fl.addWidget(cancel)
+        fl.addWidget(save)
+        right.addWidget(footer)
+        root.addLayout(right, 1)
+        self.tabs = _Sections(self.nav)
+
+    @staticmethod
+    def _section(title: str, subtitle: str, body: QWidget) -> QScrollArea:
+        """One settings section: a header and the section's controls in a card."""
+        content = QWidget()
+        content.setObjectName("page")
+        col = QVBoxLayout(content)
+        col.setContentsMargins(32, 26, 32, 26)
+        col.setSpacing(14)
+        col.addWidget(PageHeader(title, subtitle))
+        frame, lay = card()
+        lay.setContentsMargins(22, 18, 22, 20)
+        form = body.layout()
+        if isinstance(form, QFormLayout):
+            form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            form.setHorizontalSpacing(24)
+            form.setVerticalSpacing(14)
+            form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+        lay.addWidget(body)
+        col.addWidget(frame)
+        col.addStretch(1)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(centred(content, 820))
+        return scroll
 
     # -- tabs -------------------------------------------------------------------------
+    def _appearance_tab(self) -> QWidget:
+        w = QWidget()
+        f = QFormLayout(w)
+        self.theme = Segmented([("System", "system"), ("Light", "light"), ("Dark", "dark")],
+                               self.s.ui.theme)
+        self.theme.changed.connect(lambda mode: self.on_theme(str(mode)))
+        row = QHBoxLayout()
+        row.addWidget(self.theme)
+        row.addStretch(1)
+        f.addRow("Theme", row)
+        self.mini_mode = QComboBox()
+        self.mini_mode.addItem("Notch at the top of the screen (drag it to any monitor)", "notch")
+        self.mini_mode.addItem("Floating card", "card")
+        self.mini_mode.setCurrentIndex(max(0, self.mini_mode.findData(self.s.ui.mini_mode)))
+        f.addRow("Minimised Chiku", self.mini_mode)
+        self.start_compact = Toggle("Start minimised")
+        self.start_compact.setChecked(self.s.ui.start_compact)
+        f.addRow(self.start_compact)
+        self.close_to_tray = Toggle("Keep Chiku running in the tray when I close the window "
+                                    "(the wake word and Discord status stay on)")
+        self.close_to_tray.setChecked(self.s.ui.close_to_tray)
+        f.addRow(self.close_to_tray)
+        return w
+
     def _audio_tab(self) -> QWidget:
         w = QWidget()
         f = QFormLayout(w)
@@ -128,7 +250,7 @@ class SettingsDialog(QDialog):
         self.pause_ms.setSuffix(" ms")
         self.pause_ms.setValue(self.s.audio.min_silence_ms)
         f.addRow("Pause that ends your turn", self.pause_ms)
-        self.barge = QCheckBox("Let me interrupt Chiku by talking")
+        self.barge = Toggle("Let me interrupt Chiku by talking")
         self.barge.setChecked(self.s.audio.barge_in)
         f.addRow(self.barge)
         f.addRow(_note("Interrupting by voice works best with headphones. On laptop speakers "
@@ -260,7 +382,7 @@ class SettingsDialog(QDialog):
     def _background_tab(self) -> QWidget:
         w = QWidget()
         f = QFormLayout(w)
-        self.wake_on = QCheckBox("Listen for “Hey Chiku” or “Wake up” while the mic is off")
+        self.wake_on = Toggle("Listen for “Hey Chiku” or “Wake up” while the mic is off")
         self.wake_on.setChecked(self.s.wake.enabled)
         f.addRow(self.wake_on)
         self.wake_download = QPushButton(
@@ -277,7 +399,7 @@ class SettingsDialog(QDialog):
         self.follow_up.setSuffix(" s")
         self.follow_up.setValue(self.s.wake.follow_up_s)
         f.addRow("After waking, keep listening for", self.follow_up)
-        self.autostart = QCheckBox("Start Chiku in the background when I sign in to Windows")
+        self.autostart = Toggle("Start Chiku in the background when I sign in to Windows")
         self.autostart.setChecked(autostart.is_enabled())
         self.autostart.setEnabled(autostart.command() is not None)
         f.addRow(self.autostart)
@@ -361,7 +483,7 @@ class SettingsDialog(QDialog):
         self.turns.setRange(1, 50)
         self.turns.setValue(self.s.llm.max_history_turns)
         f.addRow("Turns of context remembered", self.turns)
-        self.remote = QCheckBox("Allow an Ollama server on another computer")
+        self.remote = Toggle("Allow an Ollama server on another computer")
         self.remote.setChecked(self.s.llm.allow_remote_ollama)
         f.addRow(self.remote)
         f.addRow(_note("With a local address, conversations never leave this computer. A remote "
@@ -382,7 +504,7 @@ class SettingsDialog(QDialog):
         key_row.addWidget(self.oa_key, 1)
         key_row.addWidget(store)
         f.addRow(key_row)
-        self.cloud = QCheckBox("Allow a cloud provider (sends conversations off this computer)")
+        self.cloud = Toggle("Allow a cloud provider (sends conversations off this computer)")
         self.cloud.setChecked(self.s.llm.allow_cloud)
         self.cloud.toggled.connect(self._confirm_cloud)
         f.addRow(self.cloud)
@@ -445,26 +567,13 @@ class SettingsDialog(QDialog):
         self.extra.setPlaceholderText("Anything else Chiku should keep in mind")
         self.extra.setMaximumHeight(90)
         f.addRow("Preferences", self.extra)
-        self.theme = QComboBox()
-        for key, text in (("system", "Follow Windows"), ("light", "Light"), ("dark", "Dark")):
-            self.theme.addItem(text, key)
-        self.theme.setCurrentIndex(max(0, self.theme.findData(self.s.ui.theme)))
-        f.addRow("Theme", self.theme)
-        self.mini_mode = QComboBox()
-        self.mini_mode.addItem("Notch at the top of the screen (drag it to any monitor)", "notch")
-        self.mini_mode.addItem("Floating card", "card")
-        self.mini_mode.setCurrentIndex(max(0, self.mini_mode.findData(self.s.ui.mini_mode)))
-        f.addRow("Minimised Chiku", self.mini_mode)
-        self.start_compact = QCheckBox("Start minimised")
-        self.start_compact.setChecked(self.s.ui.start_compact)
-        f.addRow(self.start_compact)
         return w
 
     def _web_tab(self) -> QWidget:
         w = QWidget()
         f = QFormLayout(w)
         web = self.s.web
-        self.search_on = QCheckBox("Let Chiku search the web (Brave Search)")
+        self.search_on = Toggle("Let Chiku search the web (Brave Search)")
         self.search_on.setChecked(web.search_enabled)
         f.addRow(self.search_on)
         self.key_status = QLabel()
@@ -490,7 +599,7 @@ class SettingsDialog(QDialog):
         self.results.setRange(1, 10)
         self.results.setValue(web.max_results)
         f.addRow("Results per search", self.results)
-        self.read_pages = QCheckBox("Let Chiku open result pages to read them")
+        self.read_pages = Toggle("Let Chiku open result pages to read them")
         self.read_pages.setChecked(web.allow_page_reading)
         f.addRow(self.read_pages)
         f.addRow(_note(
@@ -538,7 +647,7 @@ class SettingsDialog(QDialog):
             first = re.split(r"(?<!e\.g)(?<!i\.e)\.(?:\s|$)", tool.description)[0]
             if len(first) > 75:
                 first = first[:74].rsplit(" ", 1)[0] + "…"
-            box = QCheckBox(f"{tool.name}  —  {first}")
+            box = Toggle(f"{tool.name}  —  {first}")
             box.setToolTip(tool.description)
             box.setChecked(tool.name not in self.s.tools.disabled)
             self.tool_boxes[tool.name] = box
@@ -554,31 +663,31 @@ class SettingsDialog(QDialog):
         w = QWidget()
         v = QVBoxLayout(w)
         mem = self.s.memory
-        self.mem_on = QCheckBox("Let Chiku remember things you ask her to remember")
+        self.mem_on = Toggle("Let Chiku remember things you ask her to remember")
         self.mem_on.setChecked(mem.enabled)
-        self.mem_ask = QCheckBox("Ask me before Chiku saves something I didn't ask her to")
+        self.mem_ask = Toggle("Ask me before Chiku saves something I didn't ask her to")
         self.mem_ask.setChecked(mem.ask_before_model_saves)
-        self.mem_cloud = QCheckBox("Include memories when using a cloud provider")
+        self.mem_cloud = Toggle("Include memories when using a cloud provider")
         self.mem_cloud.setChecked(mem.share_with_cloud)
-        self.keep_history = QCheckBox("Keep conversation history on this computer (so chats "
+        self.keep_history = Toggle("Keep conversation history on this computer (so chats "
                                       "are still there after Chiku restarts)")
         self.keep_history.setChecked(self.s.conversations.keep_history)
-        self.discord = QCheckBox("Show “Chatting with Chiku” on my Discord profile (fixed text "
+        self.discord = Toggle("Show “Chatting with Chiku” on my Discord profile (fixed text "
                                  "and a link to Chiku on GitHub, never what we talk about)")
         self.discord.setChecked(self.s.discord.enabled)
         for b in (self.mem_on, self.mem_ask, self.mem_cloud, self.keep_history, self.discord):
             v.addWidget(b)
-        self.auto_apps = QCheckBox("Open apps without asking")
+        self.auto_apps = Toggle("Open apps without asking")
         self.auto_apps.setChecked(self.s.permissions.auto_allow_open_apps)
-        self.sensitive = QCheckBox("Always ask before opening terminals and admin tools")
+        self.sensitive = Toggle("Always ask before opening terminals and admin tools")
         self.sensitive.setChecked(self.s.permissions.confirm_sensitive_apps)
-        self.confirm_close = QCheckBox("Ask before closing apps")
+        self.confirm_close = Toggle("Ask before closing apps")
         self.confirm_close.setChecked(self.s.permissions.confirm_close_apps)
         v.addWidget(self.auto_apps)
         v.addWidget(self.sensitive)
         v.addWidget(self.confirm_close)
         fs = self.s.files
-        self.files_on = QCheckBox("Let Chiku find and open files in these folders:")
+        self.files_on = Toggle("Let Chiku find and open files in these folders:")
         self.files_on.setChecked(fs.enabled)
         v.addWidget(self.files_on)
         folder_row = QHBoxLayout()
@@ -589,9 +698,9 @@ class SettingsDialog(QDialog):
             self.folder_boxes[name] = box
             folder_row.addWidget(box)
         v.addLayout(folder_row)
-        self.files_read = QCheckBox("Let Chiku read text files to summarise them")
+        self.files_read = Toggle("Let Chiku read text files to summarise them")
         self.files_read.setChecked(fs.allow_reading)
-        self.files_change = QCheckBox("Let Chiku create folders and (with your OK each time) "
+        self.files_change = Toggle("Let Chiku create folders and (with your OK each time) "
                                       "move, rename or recycle files")
         self.files_change.setChecked(fs.allow_changes)
         v.addWidget(self.files_read)
@@ -690,7 +799,8 @@ class SettingsDialog(QDialog):
                     pron[k.strip()] = val.strip()
         data["ui"].update(theme=self.theme.currentData(),
                           start_compact=self.start_compact.isChecked(),
-                          mini_mode=self.mini_mode.currentData())
+                          mini_mode=self.mini_mode.currentData(),
+                          close_to_tray=self.close_to_tray.isChecked())
         data["wake"].update(enabled=self.wake_on.isEnabled() and self.wake_on.isChecked(),
                             follow_up_s=self.follow_up.value())
         data["persona"].update(

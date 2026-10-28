@@ -151,6 +151,9 @@ class WakeSettings(BaseModel):
 class UISettings(BaseModel):
     theme: Literal["system", "light", "dark"] = "system"
     start_compact: bool = False  # open minimised (in the mini_mode style)
+    # Closing the window keeps Chiku running in the tray (wake word, Discord status, quick
+    # reopen); "Quit Chiku" in the tray menu exits.
+    close_to_tray: bool = True
     # Minimised Chiku: a notch hanging from the top edge of a screen, or a floating card.
     mini_mode: Literal["notch", "card"] = "notch"
     # Notch position per screen (screen name -> centre as a fraction of the screen's width),

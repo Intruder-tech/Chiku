@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chiku: your voice assistant that lives on your PC</title>
+  <meta name="description" content="Chiku is a free, open-source AI voice assistant for Windows. Talk to her and she talks back, opens apps, searches the web with sources and remembers what you ask, all running on your own computer.">
+  <meta name="theme-color" content="#1d1c1a">
+  <meta property="og:title" content="Chiku: your voice assistant that lives on your PC">
+  <meta property="og:description" content="Free, open-source, local-first AI voice assistant for Windows.">
+  <meta property="og:image" content="assets/chiku.png">
+  <link rel="icon" href="assets/favicon.ico">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    // Apply the saved theme before the page paints (no flash).
+    try {
+      var t = localStorage.getItem("chiku-theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="top">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top" aria-label="Chiku home">
+        <img src="assets/chiku-256.png" alt="" width="34" height="34">
+        <span>Chiku</span>
+      </a>
+      <nav class="links" aria-label="Main">
+        <a href="#features">Features</a>
+        <a href="#privacy">Privacy</a>
+        <a href="#how">How it works</a>
+        <a href="#install">Install</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="nav-actions">
+        <button class="icon-btn" id="theme" type="button" aria-label="Switch between light and dark">
+          <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/></svg>
+          <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>
+        </button>
+        <a class="btn btn-ghost hide-sm" href="https://github.com/Intruder-tech/Chiku">
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="gh"><path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 2.9.8.1-.6.4-1.1.6-1.3-2.2-.3-4.6-1.1-4.6-5a3.9 3.9 0 0 1 1-2.7c-.1-.3-.5-1.3.1-2.7 0 0 .8-.3 2.8 1a9.6 9.6 0 0 1 5 0c1.9-1.3 2.8-1 2.8-1 .6 1.4.2 2.4.1 2.7a3.9 3.9 0 0 1 1 2.7c0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10 10 0 0 0 12 2z"/></svg>
+          GitHub
+        </a>
+        <a class="btn btn-primary" href="https://github.com/Intruder-tech/Chiku/releases/latest">Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="wrap hero-inner">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="dot"></span> Free &amp; open source · Windows 10/11</p>
+          <h1>Your voice assistant that <span class="hl">lives on your PC</span>.</h1>
+          <p class="lead">Chiku listens, talks back, opens your apps, searches the web with sources and remembers what you ask. The voice, the speech recognition and the AI model all run on your own computer.</p>
+          <div class="cta">
+            <a class="btn btn-primary btn-lg" href="https://github.com/Intruder-tech/Chiku/releases/latest">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10.5 4.4v7.2H3zM11.6 4.2 21 3v8.6h-9.4zM3 12.6h7.5v7.1L3 18.6zM11.6 12.6H21V21l-9.4-1.3z"/></svg>
+              Download for Windows
+            </a>
+            <a class="btn btn-ghost btn-lg" href="https://github.com/Intruder-tech/Chiku">View on GitHub</a>
+          </div>
+          <p class="fine" id="version-line">Installer for Windows 10/11 · no admin rights needed</p>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="halo"></div>
+          <img class="mascot" src="assets/chiku.png" alt="" width="420" height="420">
+          <div class="bubble b1">“Hey Chiku, open Spotify.”</div>
+          <div class="bubble b2 her">On it, opening Spotify.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- App preview -->
+    <section class="preview">
+      <div class="wrap">
+        <div class="window">
+          <div class="window-bar"><span></span><span></span><span></span><em>Chiku</em></div>
+          <img class="shot shot-dark" src="assets/app-chat-dark.png" alt="Chiku's chat window: a question about the weather answered with web sources, and a request to open Notepad." loading="lazy">
+          <img class="shot shot-light" src="assets/app-chat-light.png" alt="Chiku's chat window in the light theme." loading="lazy">
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="section">
+      <div class="wrap">
+        <p class="kicker">What Chiku does</p>
+        <h2>A real assistant, not just a chat box.</h2>
+        <div class="grid">
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 1 1-6 0V6a3 3 0 0 1 3-3z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+            <h3>Talk naturally</h3>
+            <p>Speak and she answers out loud, sentence by sentence. Interrupt her by talking, or type if you prefer.</p>
+          </article>
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+            <h3>Gets things done</h3>
+            <p>Opens and closes apps, finds and organises files, controls media and volume. Everything she does shows up in your Activity log.</p>
+          </article>
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
+            <h3>Researches with sources</h3>
+            <p>Ask about the news, the weather or anything current. She searches, reads the best page, and shows you where the answer came from.</p>
+          </article>
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 20V6a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M14 4v5h5M8 13h8M8 17h5"/></svg></div>
+            <h3>Remembers what you ask</h3>
+            <p>“Remember that I'm vegetarian.” You can see, edit or delete every memory, and she never stores passwords or card numbers.</p>
+          </article>
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 5c0 6 3 10 8 14 5-4 8-8 8-14"/><path d="M9 10h6"/></svg></div>
+            <h3>Speaks Hindi and more</h3>
+            <p>She replies in the language you use, with natural voices for English, Hindi, Spanish, French, Italian, Portuguese, Japanese and Chinese.</p>
+          </article>
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v2M12 19v2M5 12H3M21 12h-2"/><circle cx="12" cy="12" r="5"/><path d="M10.5 12h3"/></svg></div>
+            <h3>“Hey Chiku”</h3>
+            <p>Optional wake word: leave her in the tray and just say her name. The wake check runs on your PC and pauses when the screen is locked.</p>
+          </article>
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 7h18v10H3z"/><path d="M8 7V5h8v2M12 11v3M10.5 12.5h3"/></svg></div>
+            <h3>Installs apps for you</h3>
+            <p>“Install VLC.” “Check for updates.” Uses winget's official sources, and you confirm every change.</p>
+          </article>
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="4" rx="2"/><rect x="3" y="9" width="18" height="12" rx="2"/></svg></div>
+            <h3>Stays out of your way</h3>
+            <p>Shrink her into a notch at the top of any screen, use Ctrl+K to jump anywhere, and pick a light or dark theme.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Privacy -->
+    <section id="privacy" class="section band">
+      <div class="wrap split">
+        <div>
+          <p class="kicker">Private by design</p>
+          <h2>Your voice stays on your computer.</h2>
+          <p class="lead small">Chiku is built to be local-first. Nothing is sent anywhere unless you ask for something that needs the internet, like a web search, and even then only the search words leave your PC.</p>
+          <a class="btn btn-ghost" href="https://github.com/Intruder-tech/Chiku/blob/main/docs/SECURITY.md">Read the privacy details</a>
+        </div>
+        <ul class="checks">
+          <li><b>Local AI.</b> Speech recognition, the voice and the language model run on your PC.</li>
+          <li><b>No recordings.</b> Audio is processed in memory and never saved.</li>
+          <li><b>You're asked first.</b> Closing apps, moving files and installing software all need your OK.</li>
+          <li><b>Everything is logged.</b> Every action Chiku takes is in a local Activity log you can read.</li>
+          <li><b>Your data, your call.</b> Export or delete everything from your Profile.</li>
+          <li><b>Open source.</b> GPL-3.0 licensed: read the code, build it yourself.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section id="how" class="section">
+      <div class="wrap">
+        <p class="kicker">How it works</p>
+        <h2>Four small engines, one friendly voice.</h2>
+        <ol class="flow">
+          <li><span class="num">1</span><h3>You speak</h3><p>Voice activity detection notices when you start and stop talking.</p></li>
+          <li><span class="num">2</span><h3>She listens</h3><p>Whisper turns your speech into text, on your GPU or CPU.</p></li>
+          <li><span class="num">3</span><h3>She thinks</h3><p>A local language model (through Ollama) answers or picks the right tool.</p></li>
+          <li><span class="num">4</span><h3>She replies</h3><p>Kokoro speaks the answer in a natural voice while it is still being written.</p></li>
+        </ol>
+        <div class="duo">
+          <figure>
+            <img class="shot-dark" src="assets/app-home-dark.png" alt="A new chat: Chiku greets you with a message box and suggestions." loading="lazy">
+            <img class="shot-light" src="assets/app-home-light.png" alt="A new chat in the light theme." loading="lazy">
+            <figcaption>Every new chat starts with a greeting and a few ideas.</figcaption>
+          </figure>
+          <figure>
+            <img class="shot-dark" src="assets/app-settings-dark.png" alt="Chiku's settings: appearance with a theme switch." loading="lazy">
+            <img class="shot-light" src="assets/app-settings-light.png" alt="Chiku's settings in the light theme." loading="lazy">
+            <figcaption>Clear settings, with a switch for every ability.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- Install -->
+    <section id="install" class="section band">
+      <div class="wrap split">
+        <div>
+          <p class="kicker">Install</p>
+          <h2>Up and running in minutes.</h2>
+          <ol class="steps">
+            <li><b>Download</b> <code>Chiku-Setup.exe</code> from the <a href="https://github.com/Intruder-tech/Chiku/releases/latest">latest release</a>.</li>
+            <li><b>Run it.</b> It installs just for you, with no admin rights needed.</li>
+            <li><b>Start Chiku.</b> First-run setup checks your PC, recommends models that fit, and downloads them only after you agree.</li>
+            <li><b>Install Ollama</b> when setup asks. It runs the language model locally.</li>
+          </ol>
+          <div class="cta">
+            <a class="btn btn-primary" href="https://github.com/Intruder-tech/Chiku/releases/latest">Download for Windows</a>
+          </div>
+        </div>
+        <div class="req card">
+          <h3>What you need</h3>
+          <dl>
+            <dt>System</dt><dd>Windows 10 or 11 (64-bit)</dd>
+            <dt>Disk</dt><dd>About 6 GB free for the app and models</dd>
+            <dt>Audio</dt><dd>A microphone and speakers (headphones work best)</dd>
+            <dt>Graphics</dt><dd>Optional NVIDIA GPU for faster speech recognition; it also runs on the CPU</dd>
+            <dt>Downloads</dt><dd>About 0.9 GB for voice and speech, plus 1.3–2.5 GB for the AI model</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" class="section">
+      <div class="wrap narrow">
+        <p class="kicker">Questions</p>
+        <h2>Frequently asked</h2>
+        <details>
+          <summary>Is Chiku really free?</summary>
+          <p>Yes. Chiku is open source under the GPL-3.0 licence. There is no account, subscription or tracking.</p>
+        </details>
+        <details>
+          <summary>Does it need the internet?</summary>
+          <p>Only to download the models once, and for things that are online by nature, like web searches. Talking, opening apps, files and memory all work offline.</p>
+        </details>
+        <details>
+          <summary>Is she always listening?</summary>
+          <p>No. The microphone runs only while the mic button is on, or if you turn on the “Hey Chiku” wake word. Then the tray icon shows a green dot, and listening pauses while your screen is locked.</p>
+        </details>
+        <details>
+          <summary>Which languages does she speak?</summary>
+          <p>She understands any language the speech model knows and replies in yours. She has voices for English, Hindi, Spanish, French, Italian, Portuguese, Japanese and Chinese; other languages get text replies.</p>
+        </details>
+        <details>
+          <summary>Can I use a different AI model?</summary>
+          <p>Yes. Pick any Ollama model in Settings, or point Chiku at another local server such as LM Studio. A cloud provider is possible too, but only if you switch it on yourself, and its replies are clearly labelled.</p>
+        </details>
+        <details>
+          <summary>What does the Discord status show?</summary>
+          <p>If you turn it on, your Discord profile shows that you are using Chiku, with a link to this project. It never includes anything you say.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- Final call -->
+    <section class="section final">
+      <div class="wrap final-inner">
+        <img src="assets/chiku-256.png" alt="" width="96" height="96">
+        <h2>Say hello to Chiku.</h2>
+        <p class="lead small">Free, private, and right on your desktop.</p>
+        <div class="cta center">
+          <a class="btn btn-primary btn-lg" href="https://github.com/Intruder-tech/Chiku/releases/latest">Download for Windows</a>
+          <a class="btn btn-ghost btn-lg" href="https://github.com/Intruder-tech/Chiku">Star on GitHub</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div class="brand small">
+        <img src="assets/chiku-256.png" alt="" width="26" height="26">
+        <span>Chiku</span>
+      </div>
+      <p>Code: <a href="https://github.com/Intruder-tech/Chiku/blob/main/LICENSE">GPL-3.0-or-later</a>. The Chiku mascot artwork © 2026 Intruder-tech, all rights reserved.</p>
+      <p><a href="https://github.com/Intruder-tech/Chiku">GitHub</a> · <a href="https://github.com/Intruder-tech/Chiku/releases">Releases</a> · <a href="https://github.com/Intruder-tech/Chiku/issues">Report a problem</a></p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

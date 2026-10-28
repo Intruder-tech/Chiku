@@ -2,6 +2,42 @@
 
 All notable changes to this project are listed here. Versions follow [SemVer](https://semver.org).
 
+## [0.5.4] - 2026-10-28
+
+### Changed
+
+- New look, in the style of desktop chat apps:
+  - **Chat:** a new chat greets you by name in the middle of the window, with the message
+    box and a few suggestions underneath. Once you send something, the greeting is gone for
+    that chat, the conversation fills the window and the message box moves to the bottom.
+    The mascot picture is gone.
+  - **Messages:** Chiku's replies are plain text beside her avatar, in a centred reading
+    column; yours are bubbles on the right.
+  - **Sidebar:** New chat, Search (Ctrl+K), pages with icons, Recents, and you, with a
+    light/dark switch.
+  - **Status:** a slim strip above the chat shows Chiku's live state and voice level. The
+    side panel is now off until you ask for it (the button in that strip, or Ctrl+.).
+  - **Settings:** sections listed on the left, each with a title, description and card;
+    on/off switches instead of tick boxes; Save changes / Cancel in a footer. A new
+    **Appearance** section has a System / Light / Dark switch that applies at once, the
+    minimised style, and "keep running when closed".
+  - **Pages:** Profile, Apps, Memory and Activity share the same page headers, cards and
+    tidy tables; Memory and Activity lost their dialog-style Close buttons.
+  - Icons come from Windows' own icon font; the colours are warmer neutrals with Chiku's
+    yellow as the accent.
+- Closing the window now keeps Chiku running in the tray (`ui.close_to_tray`, on by
+  default), so the wake word and the Discord status stay on. Quit from the tray menu.
+- Discord presence shows the repository on its own line ("Free & open source ·
+  github.com/Intruder-tech/Chiku") with a single **Install Chiku from GitHub** button.
+
+### Added
+
+- Project website in `website/`, published with GitHub Pages
+  (`.github/workflows/pages.yml`).
+- `scripts/build_assets.py` also makes 1024×1024 Discord art assets
+  (`assets/branding/discord/`). Discord needs at least 512×512; the original mascot file is
+  500×500.
+
 ## [0.5.3] - 2026-10-28
 
 ### Added

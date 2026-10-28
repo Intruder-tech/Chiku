@@ -8,7 +8,6 @@ from datetime import datetime
 
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QDialog,
     QHBoxLayout,
     QHeaderView,
@@ -23,6 +22,7 @@ from PySide6.QtWidgets import (
 
 from chiku.audit import AuditLog
 from chiku.ui import theme
+from chiku.ui.components.page import tidy_table
 
 _APPROVAL = {"auto": "automatic", "user": "you approved", "denied": "blocked / declined"}
 
@@ -47,36 +47,37 @@ class ActivityDialog(QDialog):
         self.setWindowTitle("Chiku activity")
         self.resize(820, 480)
         lay = QVBoxLayout(self)
-        note = QLabel("Every action Chiku took on this computer, newest first. Stored locally in "
-                      f"{audit.path}.")
-        note.setObjectName("notice")
-        note.setWordWrap(True)
-        lay.addWidget(note)
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["When", "Action", "Details", "Permission",
-                                              "Result"])
-        hh = self.table.horizontalHeader()
-        hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        hh.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.verticalHeader().setVisible(False)
-        lay.addWidget(self.table, 1)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(12)
         row = QHBoxLayout()
-        for text, slot in (("Refresh", self.refresh), ("Open folder", self._open_folder),
-                           ("Clear history", self._clear)):
+        for text, slot in (("Refresh", self.refresh), ("Open folder", self._open_folder)):
             b = QPushButton(text)
             b.clicked.connect(slot)
             row.addWidget(b)
         row.addStretch()
-        close = QPushButton("Close")
-        close.clicked.connect(self.accept)
-        row.addWidget(close)
+        self.count_label = QLabel("")
+        self.count_label.setObjectName("status")
+        row.addWidget(self.count_label)
+        clear = QPushButton("Clear history")
+        clear.setObjectName("danger")
+        clear.clicked.connect(self._clear)
+        row.addWidget(clear)
         lay.addLayout(row)
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(["When", "Action", "Details", "Permission",
+                                              "Result"])
+        tidy_table(self.table)
+        hh = self.table.horizontalHeader()
+        hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        hh.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        for col, width in ((0, 130), (1, 150), (3, 130)):
+            self.table.setColumnWidth(col, width)
+        lay.addWidget(self.table, 1)
         self.refresh()
 
     def refresh(self) -> None:
         rows = list(reversed(self.audit.tail(500)))
+        self.count_label.setText(f"{len(rows)} action{'' if len(rows) == 1 else 's'}")
         self.table.setRowCount(len(rows))
         for r, e in enumerate(rows):
             result = ("✓ " if e.get("ok") else "✕ ") + str(e.get("message", ""))

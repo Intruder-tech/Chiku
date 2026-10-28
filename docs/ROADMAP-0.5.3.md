@@ -66,8 +66,10 @@ Decisions from the project owner, 2026-10-28.
 
 **Status: implemented, not yet released.** It uses a small self-written IPC client (no new
 dependency). The checkbox is in Settings → Privacy; the Application ID is in the settings
-file (`discord.application_id`), not in the UI. Tested against a fake Discord pipe; not yet
-against a running Discord app.
+file (`discord.application_id`), not in the UI. Tested against a fake Discord pipe and live
+against the Discord desktop app (2026-10-28): the handshake with Chiku's Application ID and
+`SET_ACTIVITY` succeeded, the presence stayed up for 45 s without errors, and stopping
+cleared it.
 
 - Use the local Discord IPC pipe `\\.\pipe\discord-ipc-N` with a small self-written client
   (no new dependency), or `pypresence` (MIT) if that proves simpler.
@@ -161,7 +163,8 @@ from the plan:
 1. Go to <https://discord.com/developers/applications> → **New Application** → name it
    **Chiku**.
 2. On **General Information**, copy the **Application ID**.
-3. Under **Rich Presence → Art Assets**, upload `assets/branding/chiku-transparent.png`
-   (512×512 or larger) with the key **`chiku`**. Optionally upload
-   `chiku-background.jpg` as **`chiku_bg`**.
+3. Under **Rich Presence → Art Assets**, upload `assets/branding/discord/chiku-1024.png` with
+   the key **`chiku`**. Discord needs at least 512×512, and the original
+   `chiku-transparent.png` is only 500×500, so `scripts/build_assets.py` makes 1024×1024
+   copies. Optionally upload `chiku-bg-1024.png` as **`chiku_bg`**.
 4. Send the Application ID. It is a public identifier, not a secret.

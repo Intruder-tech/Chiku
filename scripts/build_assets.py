@@ -18,6 +18,7 @@ SRC_T = ROOT / "assets" / "branding" / "chiku-transparent.png"
 SRC_B = ROOT / "assets" / "branding" / "chiku-background.jpg"
 PKG = ROOT / "src" / "chiku" / "assets"
 INSTALLER = ROOT / "packaging" / "installer"
+DISCORD = ROOT / "assets" / "branding" / "discord"
 ICO_SIZES = [16, 20, 24, 32, 40, 48, 64, 96, 128, 256]
 
 
@@ -68,6 +69,13 @@ def main() -> int:
         letterbox(t, (55 * scale, 58 * scale), (255, 255, 255)).save(
             INSTALLER / f"wizard-small-{scale * 100}.bmp")
 
+    # Discord Rich Presence art assets (uploaded by hand in the Discord developer portal, which
+    # needs at least 512x512; 1024x1024 is recommended). Keys: "chiku" and "chiku_bg".
+    DISCORD.mkdir(parents=True, exist_ok=True)
+    icon_src.resize((1024, 1024), Image.LANCZOS).save(DISCORD / "chiku-1024.png", optimize=True)
+    square(b, bg).resize((1024, 1024), Image.LANCZOS).save(DISCORD / "chiku-bg-1024.png",
+                                                           optimize=True)
+
     # verification
     ico = Image.open(PKG / "chiku.ico")
     sizes = sorted(ico.info.get("sizes", set()))
@@ -77,7 +85,9 @@ def main() -> int:
     after = {p: sha(p) for p in (SRC_T, SRC_B)}
     assert before == after, "source artwork changed!"
     print(f"icon sizes: {[s[0] for s in sizes]} (transparency preserved)")
-    for p in sorted(PKG.glob("*")) + sorted(INSTALLER.glob("*")):
+    for d in (DISCORD / "chiku-1024.png", DISCORD / "chiku-bg-1024.png"):
+        assert Image.open(d).size == (1024, 1024), d
+    for p in sorted(PKG.glob("*")) + sorted(INSTALLER.glob("*")) + sorted(DISCORD.glob("*")):
         print(f"wrote {p.relative_to(ROOT)} ({p.stat().st_size // 1024} KB)")
     print("originals unchanged:", {p.name: h[:12] for p, h in after.items()})
     return 0

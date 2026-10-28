@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QDialog,
     QFileDialog,
     QHBoxLayout,
@@ -21,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from chiku.memory import CATEGORIES, MemoryItem, MemoryRejected, MemoryStore
+from chiku.ui.components.page import tidy_table
 
 
 def _local(ts: str) -> str:
@@ -37,35 +37,40 @@ class MemoryDialog(QDialog):
         self.setWindowTitle("What Chiku remembers")
         self.resize(640, 460)
         lay = QVBoxLayout(self)
-        intro = QLabel("Chiku only keeps things you asked her to remember or approved. "
-                       "Stored on this computer only (memory.db). Double-click to edit.")
-        intro.setObjectName("notice")
-        intro.setWordWrap(True)
-        lay.addWidget(intro)
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Memory", "Type", "Updated", "Source"])
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.verticalHeader().setVisible(False)
-        self.table.cellDoubleClicked.connect(lambda _r, _c: self._edit())
-        lay.addWidget(self.table, 1)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(12)
         row = QHBoxLayout()
-        for text, slot in (("Add…", self._add), ("Edit…", self._edit), ("Delete", self._delete),
-                           ("Export…", self._export), ("Forget everything", self._clear)):
+        for text, slot, name in (("Add memory", self._add, "primary"), ("Edit", self._edit, ""),
+                                 ("Delete", self._delete, ""), ("Export…", self._export, "")):
             b = QPushButton(text)
+            if name:
+                b.setObjectName(name)
             b.clicked.connect(slot)
             row.addWidget(b)
         row.addStretch()
-        close = QPushButton("Close")
-        close.clicked.connect(self.accept)
-        row.addWidget(close)
+        self.count_label = QLabel("")
+        self.count_label.setObjectName("status")
+        row.addWidget(self.count_label)
+        forget = QPushButton("Forget everything")
+        forget.setObjectName("danger")
+        forget.clicked.connect(self._clear)
+        row.addWidget(forget)
         lay.addLayout(row)
+        self.table = QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(["Memory", "Type", "Updated", "Source"])
+        tidy_table(self.table)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for col, width in ((1, 110), (2, 150), (3, 150)):
+            self.table.setColumnWidth(col, width)
+        self.table.cellDoubleClicked.connect(lambda _r, _c: self._edit())
+        lay.addWidget(self.table, 1)
         self._items: list[MemoryItem] = []
         self.refresh()
 
     def refresh(self) -> None:
         self._items = self.store.all()
+        n = len(self._items)
+        self.count_label.setText(f"{n} memor{'y' if n == 1 else 'ies'}")
         self.table.setRowCount(len(self._items))
         for r, it in enumerate(self._items):
             for c, val in enumerate((it.text, it.category, _local(it.updated), it.source)):

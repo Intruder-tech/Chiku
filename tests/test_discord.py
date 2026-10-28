@@ -65,8 +65,9 @@ def test_presence_shows_fixed_text_and_clears_on_stop() -> None:
     assert pipe.frames[0] == (0, {"v": 1, "client_id": APP_ID})
     act = pipe.activities()[0]
     assert act is not None
-    assert act["details"] == "Chatting with Chiku"
-    assert [b["url"] for b in act["buttons"]] == [REPO_URL, f"{REPO_URL}/releases"]
+    assert act["details"].startswith("Chatting with Chiku")
+    assert "github.com/Intruder-tech/Chiku" in act["state"]  # the repository, on its own line
+    assert act["buttons"] == [{"label": "Install Chiku from GitHub", "url": REPO_URL}]
     assert set(act) == {"details", "state", "timestamps", "assets", "buttons"}  # nothing else
     p.stop()
     assert not p.running and pipe.activities()[-1] is None  # cleared from the profile

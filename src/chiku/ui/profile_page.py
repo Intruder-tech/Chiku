@@ -35,6 +35,7 @@ from chiku.memory import CATEGORIES
 from chiku.paths import AppPaths
 from chiku.ui import theme
 from chiku.ui.components import button, label, named
+from chiku.ui.components.page import PageHeader, card, centred
 
 _CATEGORY_NAMES = {"preference": "Preferences", "fact": "Facts", "person": "People",
                    "other": "Other"}
@@ -81,11 +82,7 @@ def initials_pixmap(name: str, size: int) -> QPixmap:
 
 
 def _card(title: str) -> tuple[QFrame, QVBoxLayout]:
-    card = named(QFrame(), "card")
-    lay = QVBoxLayout(card)
-    lay.setContentsMargins(16, 12, 16, 14)
-    lay.addWidget(label(title, "sectionTitle"))
-    return card, lay
+    return card(title)
 
 
 class ProfilePage(QScrollArea):
@@ -101,19 +98,20 @@ class ProfilePage(QScrollArea):
         self.conversations = conversations
         self._ask = ask or _ask_yes_no
         self.setWidgetResizable(True)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         body = named(QWidget(), "page")
         self.col = QVBoxLayout(body)
-        self.col.setContentsMargins(20, 16, 20, 20)
-        self.col.setSpacing(12)
-        self.setWidget(body)
-        top = QHBoxLayout()
-        top.addWidget(label("Profile", "pageTitle"), 1)
+        self.col.setContentsMargins(32, 26, 32, 26)
+        self.col.setSpacing(14)
+        self.setWidget(centred(body))
+        header = PageHeader("Profile", "How Chiku knows you, what she remembers, and what she "
+                            "has done for you. Everything here stays on this computer.")
         self.status = label("", "status")
-        top.addWidget(self.status)
-        save = button("Save", "primary")
+        header.add_action(self.status)
+        save = button("Save changes", "primary")
         save.clicked.connect(self.save)
-        top.addWidget(save)
-        self.col.addLayout(top)
+        header.add_action(save)
+        self.col.addWidget(header)
         self._build_you()
         self._build_style()
         self._build_memories()

@@ -34,7 +34,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QStackedWidget,
     QSystemTrayIcon,
-    QVBoxLayout,
     QWidget,
 )
 
@@ -51,9 +50,8 @@ from chiku.tools.base import ToolResult
 from chiku.ui import theme
 from chiku.ui.compact import CompactWindow
 from chiku.ui.components import named
-from chiku.ui.components.chat import ChatView
+from chiku.ui.components.chat_page import ChatPage
 from chiku.ui.components.context_panel import ContextPanel
-from chiku.ui.components.input_bar import InputBar
 from chiku.ui.components.palette import Command, CommandPalette
 from chiku.ui.components.sidebar import PAGES, Sidebar
 from chiku.ui.notch import NotchWindow
@@ -62,8 +60,8 @@ from chiku.ui.viewmodel import AssistantViewModel
 from chiku.ui.waveform import Mode
 from chiku.wake import WAKE_MODEL
 
-SETTINGS_TABS = ("Audio", "Voice", "Languages", "Background", "AI model", "Persona", "Web",
-                 "Tools", "Privacy")
+SETTINGS_TABS = ("Appearance", "Voice", "Audio", "Languages", "Background", "AI model",
+                 "Persona", "Web", "Tools", "Privacy")
 PANEL_MIN_WIDTH = 1060  # narrower windows hide the right panel (Ctrl+. shows it)
 
 
@@ -94,7 +92,7 @@ class MainWindow(QMainWindow):
         self._quitting = False
         self._told_tray = False
         self._woke_mini = False
-        self._panel_hidden_by_user = False
+        self._panel_hidden_by_user = True  # the side panel is opt-in (Ctrl+.)
         cs = lambda: self.assistant.settings.conversations  # noqa: E731
         self.conversations = ConversationStore(paths.conversations_file,
                                                keep=lambda: cs().keep_history,
@@ -141,20 +139,17 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         row.addWidget(self.stack, 1)
         self.panel = ContextPanel(on_link=self.assistant.open_link)
+        self.panel.hide()  # off until asked for (Ctrl+. or the button above the chat)
         self.voice = self.panel.voice
         row.addWidget(self.panel)
 
-        chat = named(QWidget(), "page")
-        col = QVBoxLayout(chat)
-        col.setContentsMargins(0, 0, 0, 0)
-        col.setSpacing(0)
-        self.chat = ChatView(on_link=self.assistant.open_link)
-        self.input = InputBar()
-        col.addWidget(self.chat, 1)
-        col.addWidget(self.input)
-        self.pages: dict[str, QWidget] = {"chat": chat}
-        self.stack.addWidget(chat)
+        self.chat_page = ChatPage(on_link=self.assistant.open_link)
+        self.chat = self.chat_page.chat
+        self.input = self.chat_page.input
+        self.pages: dict[str, QWidget] = {"chat": self.chat_page}
+        self.stack.addWidget(self.chat_page)
         self.setCentralWidget(central)
+        self._show_user()
 
     def _page(self, key: str) -> QWidget:
         if key not in self.pages:
@@ -163,14 +158,19 @@ class MainWindow(QMainWindow):
 
                 store = self.assistant.memory
                 assert store is not None
-                page: QWidget = DialogPage("What Chiku remembers",
-                                           lambda p: MemoryDialog(store, p))
+                page: QWidget = DialogPage(
+                    "Memory", lambda p: MemoryDialog(store, p),
+                    subtitle="Only what you asked Chiku to remember, or approved. Stored on this "
+                    "computer. Double-click a memory to edit it.")
             elif key == "activity":
                 from chiku.ui.activity_dialog import ActivityDialog
 
                 audit = self.assistant._executor.audit  # noqa: SLF001
                 assert audit is not None
-                page = DialogPage("Activity", lambda p: ActivityDialog(audit, p))
+                page = DialogPage(
+                    "Activity", lambda p: ActivityDialog(audit, p),
+                    subtitle="Every action Chiku took on this computer, newest first, with who "
+                    "approved it. Stored locally.")
             elif key == "profile":
                 from chiku.ui.profile_page import ProfilePage
 
@@ -186,10 +186,10 @@ class MainWindow(QMainWindow):
             else:
                 from chiku.ui.settings_dialog import SettingsDialog
 
-                page = DialogPage("Settings",
+                page = DialogPage("",
                                   lambda p: SettingsDialog(self.assistant, self.paths, p,
-                                                           self.conversations),
-                                  on_accept=self._settings_saved)
+                                                           self.conversations, self.set_theme),
+                                  on_accept=self._settings_saved, margins=(0, 0, 0, 0))
             self.pages[key] = page
             self.stack.addWidget(page)
         return self.pages[key]
@@ -233,7 +233,7 @@ class MainWindow(QMainWindow):
     def new_chat(self) -> None:
         self.conversations.new()
         self.assistant.set_history([])
-        self.chat.clear()
+        self.chat_page.reset()
         self.panel.set_sources([])
         self._refresh_chats()
         self.show_page("chat")
@@ -248,7 +248,7 @@ class MainWindow(QMainWindow):
         except KeyError:
             return
         self.assistant.set_history(conv.history())
-        self.chat.clear()
+        self.chat_page.reset()
         for e in conv.entries:
             self.chat.add_entry(e.role, e.text, e.source, e.sources, e.time)
         last = next((e for e in reversed(conv.entries) if e.role == "assistant"), None)
@@ -261,7 +261,7 @@ class MainWindow(QMainWindow):
         self.conversations.delete(conv_id)
         if was_current:
             self.assistant.set_history([])
-            self.chat.clear()
+            self.chat_page.reset()
             self.panel.set_sources([])
         self._refresh_chats()
 
@@ -323,9 +323,19 @@ class MainWindow(QMainWindow):
         self.assistant.apply_settings(new)
         self._settings_saved()
 
+    def toggle_theme(self) -> None:
+        """The sidebar's sun/moon button: switch between light and dark."""
+        self.set_theme("light" if theme.current_mode == "dark" else "dark")
+
     def toggle_panel(self) -> None:
         self._panel_hidden_by_user = self.panel.isVisible()
         self.panel.setVisible(not self.panel.isVisible())
+
+    def _show_user(self) -> None:
+        name = self.assistant.settings.persona.user_name
+        picture = self.paths.avatar_file
+        self.sidebar.set_user(name, picture if picture.exists() else None)
+        self.chat_page.set_user(name)
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 - Qt override
         super().resizeEvent(event)
@@ -350,6 +360,10 @@ class MainWindow(QMainWindow):
         self.sidebar.new_chat.connect(self.new_chat)
         self.sidebar.conversation_selected.connect(self.open_conversation)
         self.sidebar.conversation_deleted.connect(self.delete_conversation)
+        self.sidebar.theme_toggled.connect(self.toggle_theme)
+        self.sidebar.search_requested.connect(self.open_palette)
+        self.chat_page.suggestion.connect(vm.send)
+        self.chat_page.strip.panel_toggled.connect(self.toggle_panel)
         for keys, action in (("Ctrl+K", self.open_palette),
                              ("Ctrl+N", self.new_chat),
                              ("Ctrl+.", self.toggle_panel),
@@ -494,6 +508,7 @@ class MainWindow(QMainWindow):
     @Slot(object, str)
     def _on_state(self, state: State, detail: str) -> None:
         self.voice.set_state(state, detail)
+        self.chat_page.strip.set_state(state, detail)
         self.compact.set_state(state, detail)
         self.notch.set_state(state, detail)
         if state is State.WAITING and self._woke_mini:
@@ -524,6 +539,8 @@ class MainWindow(QMainWindow):
         inp, out = self.vm.levels()
         state = self.assistant.state
         if self.isVisible():
+            if self.stack.currentWidget() is self.chat_page:
+                self.chat_page.strip.tick(state, inp, out, self.vm.mic_active)
             if self.panel.isVisible():
                 self.voice.tick(state, inp, out, self.vm.mic_active)
             live = self.vm.mic_active
@@ -539,6 +556,7 @@ class MainWindow(QMainWindow):
                             self.vm.mic_active or self.vm.mic_wanted, mode)
 
     def _profile_saved(self) -> None:
+        self._show_user()
         page = self.pages.get("settings")
         if isinstance(page, DialogPage):
             page.refresh()  # its Persona and Voice tabs would otherwise save the old values
@@ -560,6 +578,10 @@ class MainWindow(QMainWindow):
         if isinstance(app, QApplication):
             app.setStyleSheet(theme.apply(self.assistant.settings.ui.theme))
         self.sidebar.set_provider(self.assistant.llm_label)
+        # Icons are drawn in theme colours: re-draw them after a theme change.
+        self.sidebar.refresh_icons()
+        self.chat_page.refresh_icons()
+        self._show_user()
 
     @Slot(str, str, object)
     def _on_confirm(self, name: str, description: str, box: dict) -> None:
@@ -595,16 +617,19 @@ class MainWindow(QMainWindow):
         self.close()
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 - Qt override
-        if (not self._quitting and self.assistant.settings.wake.enabled
+        s = self.assistant.settings
+        if (not self._quitting and (s.ui.close_to_tray or s.wake.enabled)
                 and QSystemTrayIcon.isSystemTrayAvailable()):
-            # Background mode: the window closes, Chiku keeps listening for her name.
+            # Background mode: the window closes, Chiku keeps running in the tray (wake word,
+            # Discord status). Quit from the tray icon's menu.
             event.ignore()
             self.hide()
             if not self._told_tray:
                 self._told_tray = True
-                self.tray.showMessage("Chiku is still listening",
-                                      "Say “Hey Chiku” or “Wake up”. Quit from this icon's menu.",
-                                      self._icons[False], 4000)
+                hint = ("Say “Hey Chiku” or click the tray icon." if s.wake.enabled
+                        else "Click the tray icon to open me again.")
+                self.tray.showMessage("Chiku is still running", f"{hint} Quit from the icon's "
+                                      "menu.", self._icons[False], 4000)
             return
         self._timer.stop()
         if self.discord is not None:

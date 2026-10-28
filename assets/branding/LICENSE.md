@@ -8,7 +8,8 @@ and every image derived from them:
 - `assets/branding/chiku-transparent.png`
 - `assets/branding/chiku-background.jpg`
 - the files generated from them by `scripts/build_assets.py`: `src/chiku/assets/chiku.ico`,
-  `mascot-256.png`, `welcome-480.jpg`, and `packaging/installer/*.bmp`
+  `mascot-256.png`, `welcome-480.jpg`, `packaging/installer/*.bmp`, and the Discord art in
+  `assets/branding/discord/`
 
 The artwork is **not** licensed under the GPL-3.0 that covers Chiku's source code.
 

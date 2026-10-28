@@ -28,6 +28,7 @@ from chiku.cancel import CancelToken
 from chiku.tools.base import ToolResult
 from chiku.tools.packages import Package, WingetError
 from chiku.ui.components import button, label, named
+from chiku.ui.components.page import PageHeader, tidy_table
 
 RunTool = Callable[[str, dict[str, Any]], ToolResult]
 
@@ -50,10 +51,8 @@ class _PackageTable(QTableWidget):
     def __init__(self) -> None:
         super().__init__(0, len(self.COLUMNS))
         self.setHorizontalHeaderLabels(self.COLUMNS)
-        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        tidy_table(self)
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.verticalHeader().setVisible(False)
         header = self.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         # Ids and versions can be very long (ARP\Machine\X64\…): fixed widths the user can
@@ -96,11 +95,10 @@ class AppsPage(QWidget):
         self.loaded = False
 
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(20, 16, 20, 12)
-        lay.addWidget(label("Apps", "pageTitle"))
-        lay.addWidget(label("Uses winget's official sources (winget and Microsoft Store). Every "
-                            "install, update or uninstall asks you first and is logged.",
-                            "notice", wrap=True))
+        lay.setContentsMargins(32, 26, 32, 18)
+        lay.setSpacing(12)
+        lay.addWidget(PageHeader("Apps", "Install, update and remove apps with winget's official "
+                                 "sources. Every change asks you first and is logged."))
         self.tabs = QTabWidget()
         self.tabs.addTab(self._installed_tab(), "Installed")
         self.tabs.addTab(self._updates_tab(), "Updates")

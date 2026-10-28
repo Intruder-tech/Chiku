@@ -85,7 +85,7 @@ def test_chat_view_bubbles_sources_and_tools(app: QApplication) -> None:
                               [{"title": "<b>Site</b>", "url": "https://news.example/a"},
                                {"title": "bad", "url": "javascript:alert(1)"}]))
     view.show_tool(ToolActivity("web_search", "ok", "Brave: 2 results"))
-    assert view.welcome.isHidden()
+    assert not view.is_empty
     assert set(view.bubbles) == {1, 2}
     b = view.bubbles[2]
     assert b.text.text() == "Full answer." and b.sources_added

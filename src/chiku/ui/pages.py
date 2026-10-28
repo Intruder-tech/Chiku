@@ -7,7 +7,8 @@ from collections.abc import Callable
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QWidget
 
-from chiku.ui.components import label, named
+from chiku.ui.components import named
+from chiku.ui.components.page import PageHeader
 
 
 class DialogPage(QWidget):
@@ -15,20 +16,25 @@ class DialogPage(QWidget):
     the page always shows current data; `on_accept` runs after a Save."""
 
     def __init__(self, title: str, factory: Callable[[QWidget], QDialog],
-                 on_accept: Callable[[], None] = lambda: None):
+                 on_accept: Callable[[], None] = lambda: None, subtitle: str = "",
+                 margins: tuple[int, int, int, int] = (32, 26, 32, 18)):
         super().__init__()
         self.setObjectName("page")
         self.factory = factory
         self.on_accept = on_accept
         self.lay = QVBoxLayout(self)
-        self.lay.setContentsMargins(20, 16, 20, 12)
-        self.lay.addWidget(label(title, "pageTitle"))
+        self.lay.setContentsMargins(*margins)
+        if title:
+            self.lay.addWidget(PageHeader(title, subtitle))
         self.dialog: QDialog | None = None
         self.refresh()
 
     def refresh(self) -> None:
         if self.dialog is not None:
-            self.dialog.deleteLater()
+            old = self.dialog
+            self.lay.removeWidget(old)
+            old.hide()  # gone now; the actual delete waits for the event loop
+            old.deleteLater()
         d = self.factory(self)
         d.setWindowFlags(Qt.WindowType.Widget)
         named(d, "page")

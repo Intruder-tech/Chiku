@@ -241,7 +241,6 @@ def test_apps_page_lists_and_changes_through_tools(app) -> None:  # noqa: ANN001
 @pytest.mark.usefixtures("app")
 def test_context_panel_and_chat_replay() -> None:
     from chiku.assistant import ToolActivity
-    from chiku.ui.components.chat import ChatView
     from chiku.ui.components.context_panel import MAX_ACTIONS, ContextPanel
 
     panel = ContextPanel()
@@ -256,17 +255,27 @@ def test_context_panel_and_chat_replay() -> None:
     panel.set_sources([])
     assert panel.sources.isHidden()
 
-    chat = ChatView()
-    chat.add_entry("user", "hi", stamp="09:15")
-    chat.add_entry("assistant", "Hello!", "local · test", stamp="09:15")
-    assert chat.welcome.isHidden()
-    chat.clear()
-    assert not chat.welcome.isHidden() and chat.column.count() == 2
     from chiku.ui.components.chat import Bubble
+    from chiku.ui.components.chat_page import ChatPage, greeting_for
 
+    page = ChatPage()
+    page.set_user("Jalaj")
+    chat = page.chat
+    assert page.is_new_chat and not page.greeting_box.isHidden() and chat.isHidden()
+    assert page.greeting.text().endswith(", Jalaj") and page.greeting.text().startswith("Good ")
+    chat.add_entry("user", "hi", stamp="09:15")  # the chat starts: the greeting goes
+    chat.add_entry("assistant", "Hello!", "local · test", stamp="09:15")
+    assert not page.is_new_chat and page.greeting_box.isHidden() and not chat.isHidden()
+    assert not chat.is_empty
+    page.reset()  # a new chat greets again
+    assert page.is_new_chat and chat.is_empty and chat.column.count() == 1
     assert all(b.isHidden() for b in chat.widget().findChildren(Bubble))  # none left on screen
+    from datetime import datetime
+
+    assert greeting_for("A", datetime(2026, 1, 1, 9)) == "Good morning, A"
+    assert greeting_for(None, datetime(2026, 1, 1, 21)) == "Good evening"
     panel.deleteLater()
-    chat.deleteLater()
+    page.deleteLater()
 
 
 def test_run_winget_reads_large_output_without_hanging(monkeypatch: pytest.MonkeyPatch) -> None:
