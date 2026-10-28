@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "audio": {
+    "input_device": null,
+    "output_device": null,
+    "vad_threshold": 0.5,
+    "min_speech_ms": 250,
+    "min_silence_ms": 700,
+    "max_utterance_s": 30.0,
+    "barge_in": true,
+    "barge_in_threshold": 0.85,
+    "barge_in_min_ms": 350
+  },
+  "stt": {
+    "model": "small.en",
+    "device": "auto",
+    "compute_type": "int8",
+    "language": "en",
+    "cpu_threads": 16
+  },
+  "tts": {
+    "engine": "kokoro",
+    "voice": "af_heart",
+    "speed": 1.0,
+    "lang": "en-us"
+  },
+  "llm": {
+    "provider": "ollama",
+    "ollama_url": "http://127.0.0.1:11434",
+    "model": "qwen3:4b-instruct-2507-q4_K_M",
+    "temperature": 0.7,
+    "context_tokens": 8192,
+    "request_timeout_s": 90.0,
+    "keep_alive": "30m",
+    "max_history_turns": 12,
+    "allow_remote_ollama": false,
+    "openai_base_url": "http://127.0.0.1:1234/v1",
+    "openai_model": "",
+    "allow_cloud": false
+  },
+  "persona": {
+    "name": "Chiku",
+    "user_name": null,
+    "tone": "warm, upbeat, curious and a little playful; a knowledgeable friend, never robotic",
+    "response_length": "balanced",
+    "language": "English",
+    "pronunciations": {},
+    "extra_instructions": ""
+  },
+  "permissions": {
+    "auto_allow_open_apps": true,
+    "confirm_sensitive_apps": true,
+    "confirm_close_apps": true,
+    "allowed_url_domains": [
+      "google.com",
+      "youtube.com",
+      "wikipedia.org",
+      "github.com",
+      "microsoft.com",
+      "bing.com"
+    ]
+  },
+  "web": {
+    "search_enabled": true,
+    "provider": "brave",
+    "max_results": 5,
+    "country": "",
+    "safesearch": "moderate",
+    "allow_page_reading": true
+  },
+  "files": {
+    "enabled": true,
+    "folders": ["Desktop", "Documents", "Downloads", "Pictures", "Music", "Videos"],
+    "allow_reading": true,
+    "allow_changes": true
+  },
+  "memory": {
+    "enabled": true,
+    "ask_before_model_saves": true,
+    "share_with_cloud": false,
+    "max_in_prompt": 40
+  },
+  "tools": {
+    "disabled": []
+  }
+}

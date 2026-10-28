@@ -1,0 +1,103 @@
+"""Action history: every tool Chiku ran, whether it was approved, and what happened."""
+
+from __future__ import annotations
+
+import json
+import os
+from datetime import datetime
+
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from chiku.audit import AuditLog
+from chiku.ui import theme
+
+_APPROVAL = {"auto": "automatic", "user": "you approved", "denied": "blocked / declined"}
+
+
+def _local(ts: str) -> str:
+    try:
+        return datetime.fromisoformat(ts).astimezone().strftime("%d %b %H:%M:%S")
+    except ValueError:
+        return ts
+
+
+def summarize_args(args: object) -> str:
+    if isinstance(args, dict):
+        return ", ".join(f"{k}={v}" for k, v in args.items() if v not in (None, "", []))[:160]
+    return json.dumps(args, ensure_ascii=False)[:160]
+
+
+class ActivityDialog(QDialog):
+    def __init__(self, audit: AuditLog, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.audit = audit
+        self.setWindowTitle("Chiku activity")
+        self.resize(820, 480)
+        lay = QVBoxLayout(self)
+        note = QLabel("Every action Chiku took on this computer, newest first. Stored locally in "
+                      f"{audit.path}.")
+        note.setObjectName("notice")
+        note.setWordWrap(True)
+        lay.addWidget(note)
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(["When", "Action", "Details", "Permission",
+                                              "Result"])
+        hh = self.table.horizontalHeader()
+        hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        hh.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.verticalHeader().setVisible(False)
+        lay.addWidget(self.table, 1)
+        row = QHBoxLayout()
+        for text, slot in (("Refresh", self.refresh), ("Open folder", self._open_folder),
+                           ("Clear history", self._clear)):
+            b = QPushButton(text)
+            b.clicked.connect(slot)
+            row.addWidget(b)
+        row.addStretch()
+        close = QPushButton("Close")
+        close.clicked.connect(self.accept)
+        row.addWidget(close)
+        lay.addLayout(row)
+        self.refresh()
+
+    def refresh(self) -> None:
+        rows = list(reversed(self.audit.tail(500)))
+        self.table.setRowCount(len(rows))
+        for r, e in enumerate(rows):
+            result = ("✓ " if e.get("ok") else "✕ ") + str(e.get("message", ""))
+            vals = [_local(str(e.get("ts", ""))), str(e.get("tool", "")),
+                    summarize_args(e.get("args")),
+                    _APPROVAL.get(str(e.get("approval")), str(e.get("approval"))), result]
+            for c, v in enumerate(vals):
+                cell = QTableWidgetItem(v)
+                cell.setToolTip(v)
+                if c == 4 and not e.get("ok"):
+                    cell.setForeground(QColor(theme.ERROR))
+                self.table.setItem(r, c, cell)
+
+    def _open_folder(self) -> None:
+        os.startfile(self.audit.path.parent)  # noqa: S606
+
+    def _clear(self) -> None:
+        if QMessageBox.question(
+            self, "Chiku", "Delete the whole action history? This can't be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        ) == QMessageBox.StandardButton.Yes:
+            self.audit.clear()
+            self.refresh()

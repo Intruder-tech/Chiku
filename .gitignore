@@ -1,0 +1,27 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# Local runtime data never belongs in the repo (models, logs, audit, settings live in
+# %LOCALAPPDATA%/%APPDATA%, but guard against CHIKU_HOME pointing inside the tree).
+chiku-home/
+*.onnx
+*.bin
+*.log
+actions.jsonl
+settings.json
+.env
+*.key
+
+# local tooling
+.claude/
+packaging/build/
+packaging/dist/
+packaging/output/
+packaging/version_info.txt
