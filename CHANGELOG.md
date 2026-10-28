@@ -4,9 +4,6 @@ All notable changes to this project are listed here. Versions follow [SemVer](ht
 
 ## [0.5.3] - 2026-10-28
 
-Discord Rich Presence (roadmap item 3) is not in this release; it needs the Discord
-application to be created first.
-
 ### Added
 
 - Multilingual conversation. With the multilingual Whisper model (Settings → Languages, one
@@ -22,6 +19,12 @@ application to be created first.
     "आवाज़ बढ़ाओ", "VLC install karo", "याद रखना कि …". Chiku acknowledges them in Hindi.
 - New settings: `stt.preferred_languages`, `tts.voices` (voice per language), and `stt.language`
   `auto`. A Languages tab in Settings has a Hindi voice test.
+- Discord Rich Presence (opt-in, Settings → Privacy): "Chatting with Chiku · Local AI voice
+  assistant" on your Discord profile, with **Get Chiku** and **Releases** buttons linking to
+  the GitHub repository. Fixed text only; nothing from conversations, memory, apps or files.
+  It talks to the Discord app through its local IPC pipe (no new dependency, no network
+  calls from Chiku), retries quietly while Discord isn't running, and clears the status when
+  turned off or when Chiku quits.
 - Pro workspace: three panes.
   - **Left:** pages (Chat, Profile, Apps, Memory, Activity, Settings) and a list of chats.
   - **Centre:** the chat or the current page.

@@ -44,6 +44,7 @@ from chiku.branding import ICON, asset
 from chiku.cancel import CancelToken
 from chiku.config import Settings, save_settings
 from chiku.conversations import ConversationStore
+from chiku.discord_presence import DiscordPresence
 from chiku.models import WHISPER_SIZES_MB, whisper_present
 from chiku.paths import AppPaths
 from chiku.tools.base import ToolResult
@@ -122,6 +123,8 @@ class MainWindow(QMainWindow):
         self._timer.start(33)
         self.assistant.start()
         self._refresh_chats()
+        self.discord: DiscordPresence | None = None
+        self._sync_discord()
         catalog = self.assistant._catalog  # noqa: SLF001
         if catalog is not None:  # warm the app list for the command palette
             threading.Thread(target=catalog.entries, daemon=True, name="chiku-catalog").start()
@@ -540,7 +543,19 @@ class MainWindow(QMainWindow):
         if isinstance(page, DialogPage):
             page.refresh()  # its Persona and Voice tabs would otherwise save the old values
 
+    def _sync_discord(self) -> None:
+        """Start or stop the opt-in Discord presence to match the settings."""
+        d = self.assistant.settings.discord
+        if self.discord is not None and (not d.enabled
+                                         or self.discord.application_id != d.application_id):
+            self.discord.stop()
+            self.discord = None
+        if d.enabled and self.discord is None:
+            self.discord = DiscordPresence(d.application_id)
+            self.discord.start()
+
     def _settings_saved(self) -> None:
+        self._sync_discord()
         app = QApplication.instance()
         if isinstance(app, QApplication):
             app.setStyleSheet(theme.apply(self.assistant.settings.ui.theme))
@@ -592,6 +607,8 @@ class MainWindow(QMainWindow):
                                       self._icons[False], 4000)
             return
         self._timer.stop()
+        if self.discord is not None:
+            self.discord.stop()
         apps = self.pages.get("apps")
         shutdown = getattr(apps, "shutdown", None)
         if shutdown is not None:

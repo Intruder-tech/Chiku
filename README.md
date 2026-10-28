@@ -118,6 +118,9 @@ below.
   card is the alternative style (Settings → Persona → Minimised Chiku).
 - **Tool switches.** Settings → Tools turns any single ability off; that tool is hidden from the
   AI and refused.
+- **Discord presence** (opt-in, Settings → Privacy). It shows "Chatting with Chiku" with a
+  link to this repository on your Discord profile. The text is fixed; what you say is
+  never shared.
 - **Wake word and background mode** (opt-in, Settings → Background). With the mic off, say
   "Hey Chiku" or "Wake up": she chimes and listens. Speech is checked on this PC by a small
   Whisper model and then discarded. The tray icon shows a green dot while she listens for her
@@ -232,6 +235,8 @@ Notable ones:
 - `conversations.keep_history`: save chats to `%LOCALAPPDATA%\Chiku\conversations.json`
   (off by default; turning it off deletes the file). `persona.interests`: topics Chiku can
   draw examples from.
+- `discord.enabled`: show the Discord presence (`discord.application_id` is Chiku's public
+  Discord application id).
 - `wake.enabled`: listen for "Hey Chiku" / "Wake up" while the mic is off (needs Whisper
   `tiny.en`). `wake.follow_up_s`: how long she keeps listening after waking or answering.
 
@@ -242,7 +247,7 @@ folder (portable mode).
 ## Tests
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest                         # 433 unit tests, no hardware needed
+.\.venv\Scripts\python.exe -m pytest                         # 438 unit tests, no hardware needed
 .\.venv\Scripts\python.exe -m pytest -m "models or ollama or system"   # real models, Ollama, Recycle Bin
 .\.venv\Scripts\ruff.exe check src tests
 .\.venv\Scripts\mypy.exe

@@ -96,5 +96,9 @@
   "conversations": {
     "keep_history": false,
     "max_saved": 50
+  },
+  "discord": {
+    "enabled": false,
+    "application_id": "1564988707596017754"
   }
 }

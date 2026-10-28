@@ -126,6 +126,14 @@ class MemorySettings(BaseModel):
     max_in_prompt: int = Field(40, ge=0, le=200)
 
 
+class DiscordSettings(BaseModel):
+    # Opt-in: show "Chatting with Chiku" (fixed text and a link to Chiku on GitHub) on the
+    # user's Discord profile, through the local Discord app. Never conversation content.
+    enabled: bool = False
+    # Chiku's Discord application (a public identifier, not a secret).
+    application_id: str = Field("1564988707596017754", pattern=r"^\d{17,20}$")
+
+
 class ConversationSettings(BaseModel):
     # Off by default: chats live in memory and are gone when Chiku closes.
     keep_history: bool = False
@@ -188,6 +196,7 @@ class Settings(BaseModel):
     ui: UISettings = Field(default_factory=UISettings)
     wake: WakeSettings = Field(default_factory=WakeSettings)
     conversations: ConversationSettings = Field(default_factory=ConversationSettings)
+    discord: DiscordSettings = Field(default_factory=DiscordSettings)
 
 
 def is_loopback_url(url: str) -> bool:

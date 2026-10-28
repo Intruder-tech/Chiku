@@ -64,6 +64,11 @@ Decisions from the project owner, 2026-10-28.
 
 ## 3. Discord Rich Presence (opt-in, off by default)
 
+**Status: implemented, not yet released.** It uses a small self-written IPC client (no new
+dependency). The checkbox is in Settings → Privacy; the Application ID is in the settings
+file (`discord.application_id`), not in the UI. Tested against a fake Discord pipe; not yet
+against a running Discord app.
+
 - Use the local Discord IPC pipe `\\.\pipe\discord-ipc-N` with a small self-written client
   (no new dependency), or `pypresence` (MIT) if that proves simpler.
 - **What it shows:** "Chatting with Chiku" with state "Local AI voice assistant", the large

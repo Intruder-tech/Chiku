@@ -563,7 +563,10 @@ class SettingsDialog(QDialog):
         self.keep_history = QCheckBox("Keep conversation history on this computer (so chats "
                                       "are still there after Chiku restarts)")
         self.keep_history.setChecked(self.s.conversations.keep_history)
-        for b in (self.mem_on, self.mem_ask, self.mem_cloud, self.keep_history):
+        self.discord = QCheckBox("Show “Chatting with Chiku” on my Discord profile (fixed text "
+                                 "and a link to Chiku on GitHub, never what we talk about)")
+        self.discord.setChecked(self.s.discord.enabled)
+        for b in (self.mem_on, self.mem_ask, self.mem_cloud, self.keep_history, self.discord):
             v.addWidget(b)
         self.auto_apps = QCheckBox("Open apps without asking")
         self.auto_apps.setChecked(self.s.permissions.auto_allow_open_apps)
@@ -672,6 +675,7 @@ class SettingsDialog(QDialog):
             allow_cloud=self.cloud.isChecked(),
         )
         data["conversations"]["keep_history"] = self.keep_history.isChecked()
+        data["discord"]["enabled"] = self.discord.isChecked()
         data["memory"].update(
             enabled=self.mem_on.isChecked(),
             ask_before_model_saves=self.mem_ask.isChecked(),
