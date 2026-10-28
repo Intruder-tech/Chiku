@@ -14,9 +14,20 @@ from chiku.ui import theme  # noqa: E402
 
 
 @pytest.fixture(scope="module")
-def app() -> QApplication:
+def app():  # noqa: ANN201
     inst = QApplication.instance()
-    return inst if isinstance(inst, QApplication) else QApplication([])
+    qapp = inst if isinstance(inst, QApplication) else QApplication([])
+    yield qapp
+    # Destroy every widget while the QApplication still exists; otherwise Python's shutdown
+    # order can delete them after Qt is gone and the process crashes (exit code 127 in CI).
+    import gc
+
+    for w in qapp.topLevelWidgets():
+        w.close()
+        w.deleteLater()
+    qapp.processEvents()
+    gc.collect()
+    qapp.processEvents()
 
 
 def pump(app: QApplication, until, timeout: float = 2.0) -> bool:  # noqa: ANN001
