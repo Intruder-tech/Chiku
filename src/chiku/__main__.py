@@ -12,6 +12,10 @@ from chiku.paths import default_paths
 
 
 def main(argv: list[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        # The packaged console exe defaults to the ANSI code page; make output UTF-8.
+        if stream is not None and hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(prog="chiku", description="Chiku desktop assistant")
     ap.add_argument("--check", action="store_true", help="check hardware, models, Ollama, voice")
     ap.add_argument("--download-models", action="store_true", help="download missing models")

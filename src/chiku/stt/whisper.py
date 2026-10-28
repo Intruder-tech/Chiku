@@ -7,6 +7,7 @@ import os
 import re
 import site
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -55,6 +56,13 @@ class WhisperSTT:
         self.name = f"whisper {settings.model}"
 
     def load(self) -> None:
+        # One model load at a time, process-wide: the startup/reload thread and the first voice
+        # turn may both call this.
+        with _LOAD_LOCK:
+            self._load_locked()
+
+    def _load_locked(self) -> None:
+        global _CUDA_FAILED
         if self._model is not None:
             return
         if not whisper_present(self.models_dir, self.settings.model):
@@ -66,16 +74,23 @@ class WhisperSTT:
         from faster_whisper import WhisperModel
 
         path = str(whisper_dir(self.models_dir, self.settings.model))
-        if self.settings.device in ("cuda", "auto"):
-            try:
-                _register_cuda_dlls()
-                model = WhisperModel(path, device="cuda", compute_type="float16")
-                # Loading succeeds even when kernels can't run; prove it with a tiny decode.
-                list(model.transcribe(np.zeros(16000, dtype=np.float32), beam_size=1)[0])
-                self._model = model
-                self.device_used = "cuda"
-            except Exception as exc:  # CUDA libs missing / unsupported GPU
-                log.warning("whisper on CUDA unavailable (%s); using CPU", exc)
+        if self.settings.device in ("cuda", "auto") and not _CUDA_FAILED:
+            reason = _cuda_unavailable_reason()
+            if reason:
+                # Don't even try: a failed CUDA initialisation leaves CTranslate2 in a state
+                # where the next attempt in the same process hangs forever.
+                _CUDA_FAILED = True
+                log.warning("whisper on CUDA unavailable (%s); using CPU", reason)
+            else:
+                try:
+                    model = WhisperModel(path, device="cuda", compute_type="float16")
+                    # Loading succeeds even when kernels can't run; prove it with a tiny decode.
+                    list(model.transcribe(np.zeros(16000, dtype=np.float32), beam_size=1)[0])
+                    self._model = model
+                    self.device_used = "cuda"
+                except Exception as exc:  # unsupported GPU / driver problem
+                    _CUDA_FAILED = True  # never retry in this process (see above)
+                    log.warning("whisper on CUDA unavailable (%s); using CPU", exc)
         if self._model is None:
             self._model = WhisperModel(
                 path, device="cpu", compute_type=self.settings.compute_type,
@@ -107,6 +122,26 @@ class WhisperSTT:
         if _normalise(text) in _HALLUCINATIONS or re.fullmatch(r"[\[(].*[\])]", text):
             text = ""
         return Transcript(text, len(audio) / 16000, time.perf_counter() - t0)
+
+
+_LOAD_LOCK = threading.Lock()
+_CUDA_FAILED = False  # set after the first CUDA failure; CUDA is never retried in-process
+_CUDA_DLLS = ("cublas64_12.dll", "cublasLt64_12.dll", "cudnn64_9.dll")
+
+
+def _cuda_unavailable_reason() -> str | None:
+    """Why CUDA can't work here, checked safely *before* touching CTranslate2's CUDA path."""
+    if sys.platform != "win32":
+        return None
+    _register_cuda_dlls()
+    import ctypes
+
+    for dll in _CUDA_DLLS:
+        try:
+            ctypes.WinDLL(dll)
+        except OSError:
+            return f"{dll} not found; install the NVIDIA speech pack for GPU speech recognition"
+    return None
 
 
 def _register_cuda_dlls() -> bool:

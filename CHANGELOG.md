@@ -2,6 +2,18 @@
 
 All notable changes to this project are listed here. Versions follow [SemVer](https://semver.org).
 
+## [0.5.1] - 2026-10-28
+
+### Fixed
+- **Installed app could stop responding to voice after first-run setup.** On PCs without the
+  NVIDIA speech pack, the first CUDA attempt failed (as expected) and fell back to the CPU, but
+  the reload after onboarding tried CUDA again. A second CUDA initialisation in the same process
+  hangs inside CTranslate2, so voice turns never completed. Chiku now checks that the NVIDIA
+  DLLs load *before* touching CUDA, never retries CUDA after a failure, and serialises model
+  loading. The CPU fallback also starts faster (about 1 s instead of 7–8 s).
+- `chiku-cli.exe` crashed when printing non-ASCII text (for example "→") because the packaged
+  console used the ANSI code page; output is now UTF-8.
+
 ## [0.5.0] - 2026-10-28 (first public release candidate)
 
 ### Added

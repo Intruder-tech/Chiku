@@ -314,7 +314,10 @@ class Assistant:
 
     def reload(self) -> None:
         """Re-run component loading (e.g. after models were downloaded in onboarding)."""
-        self._stt = self._make_stt(self.settings.stt)
+        if getattr(self._stt, "settings", None) != self.settings.stt:
+            self._stt = self._make_stt(self.settings.stt)
+        # Otherwise keep the same instance: if it is already loaded this is a no-op, and if
+        # models were just downloaded its load() now succeeds.
         threading.Thread(target=self._load, daemon=True, name="chiku-reload").start()
 
     def set_mic(self, on: bool) -> None:
